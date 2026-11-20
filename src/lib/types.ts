@@ -217,6 +217,16 @@ export interface Settings {
   editor: string
   terminal: string
   sidebarWidth: number
+  /** Windows 알림 */
+  notifyEnabled: boolean
+  notifyCommit: boolean
+  notifyPush: boolean
+  /** 전환·병합·pull·브랜치 생성 */
+  notifyBranch: boolean
+  /** reset·강제 push·amend·rebase 같은 주의가 필요한 작업 */
+  notifyWarn: boolean
+  /** 앱을 보고 있을 때도 알림 (끄면 앱 안의 알림만) */
+  notifyWhenFocused: boolean
 }
 
 export interface AppInfo {

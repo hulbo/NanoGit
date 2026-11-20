@@ -49,6 +49,8 @@ export interface Backend {
   openTerminal(root: string): Promise<void>
   openEditor(path: string): Promise<void>
   pickFolder(): Promise<string | null>
+  /** Windows 알림 */
+  notify(title: string, body: string): Promise<void>
 }
 
 export function errorMessage(e: unknown): string {
@@ -96,6 +98,7 @@ async function createTauriBackend(): Promise<Backend> {
     revealPath: (path) => call('reveal_path', { path }),
     openTerminal: (root) => call('open_terminal', { root }),
     openEditor: (path) => call('open_editor', { path }),
+    notify: (title, body) => call('notify_send', { title, body }),
     async pickFolder() {
       const r = await dialog.open({ directory: true, multiple: false, title: '저장소 폴더 선택' })
       return typeof r === 'string' ? r : null

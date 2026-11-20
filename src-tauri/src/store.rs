@@ -33,6 +33,16 @@ pub struct Settings {
     /// auto, wt, powershell, git-bash
     pub terminal: String,
     pub sidebar_width: u32,
+    /// Windows 알림 (새 활동)
+    pub notify_enabled: bool,
+    pub notify_commit: bool,
+    pub notify_push: bool,
+    /// 전환·병합·pull·브랜치 생성
+    pub notify_branch: bool,
+    /// reset·강제 push·amend·rebase
+    pub notify_warn: bool,
+    /// 앱을 보고 있을 때도 알림
+    pub notify_when_focused: bool,
 }
 
 impl Default for Settings {
@@ -49,6 +59,12 @@ impl Default for Settings {
             editor: String::new(),
             terminal: "auto".into(),
             sidebar_width: 240,
+            notify_enabled: true,
+            notify_commit: true,
+            notify_push: true,
+            notify_branch: false,
+            notify_warn: true,
+            notify_when_focused: false,
         }
     }
 }
@@ -125,6 +141,8 @@ mod tests {
         let s = store.load();
         assert_eq!(s.theme, "dark");
         assert_eq!(s.terminal, "auto");
+        // 알림 설정이 없던 파일도 기본값(켜짐)으로 읽는다
+        assert!(s.notify_enabled && s.notify_warn && !s.notify_branch);
 
         // 깨진 파일
         std::fs::write(store.dir().join("settings.json"), "{").unwrap();

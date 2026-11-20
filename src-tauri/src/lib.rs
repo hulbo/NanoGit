@@ -29,6 +29,7 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let store = Store::open(Store::default_dir());
             let settings = store.load();
@@ -63,6 +64,7 @@ pub fn run() {
             commands::reveal_path,
             commands::open_terminal,
             commands::open_editor,
+            commands::notify_send,
         ])
         .run(tauri::generate_context!())
         .expect("NanoGit을 시작할 수 없습니다");

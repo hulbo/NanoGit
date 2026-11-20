@@ -175,6 +175,13 @@ pub fn open_terminal(core: Core<'_>, root: String) -> Result<(), String> {
     crate::shell::open_terminal(Path::new(&root), &kind)
 }
 
+/// Windows 알림 (알림 센터에도 남는다)
+#[tauri::command]
+pub fn notify_send(app: tauri::AppHandle, title: String, body: String) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification().builder().title(title).body(body).show().map_err(|e| format!("알림을 보내지 못했습니다: {e}"))
+}
+
 #[tauri::command]
 pub fn open_editor(core: Core<'_>, path: String) -> Result<(), String> {
     let editor = core.settings.lock().map(|s| s.editor.clone()).unwrap_or_default();

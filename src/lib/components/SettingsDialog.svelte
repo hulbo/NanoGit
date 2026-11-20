@@ -37,6 +37,23 @@
         <option value="light">라이트</option>
       </select>
     </label>
+    <div class="row">
+      <span>Windows 알림</span>
+      <div class="checks">
+        <label class="chk"><input type="checkbox" bind:checked={s.notifyEnabled} onchange={save} />새 활동을 알림으로 보기</label>
+        <div class="sub" class:off={!s.notifyEnabled}>
+          <label class="chk"><input type="checkbox" bind:checked={s.notifyCommit} disabled={!s.notifyEnabled} onchange={save} />커밋</label>
+          <label class="chk"><input type="checkbox" bind:checked={s.notifyPush} disabled={!s.notifyEnabled} onchange={save} />push</label>
+          <label class="chk"><input type="checkbox" bind:checked={s.notifyWarn} disabled={!s.notifyEnabled} onchange={save} />주의 (reset·강제 push·amend·rebase)</label>
+          <label class="chk"><input type="checkbox" bind:checked={s.notifyBranch} disabled={!s.notifyEnabled} onchange={save} />브랜치 (전환·병합·pull)</label>
+          <label class="chk"><input type="checkbox" bind:checked={s.notifyWhenFocused} disabled={!s.notifyEnabled} onchange={save} />NanoGit을 보고 있을 때도 알림</label>
+        </div>
+        <div class="test">
+          <button class="ghost on" disabled={!s.notifyEnabled} onclick={() => app.testNotify()}><Icon name="check" size={13} />알림 시험</button>
+          <small>여러 개가 한꺼번에 생기면 묶어서 알립니다</small>
+        </div>
+      </div>
+    </div>
     <label>
       <span>주기적 fetch</span>
       <select bind:value={s.fetchMinutes} onchange={save}>
@@ -108,10 +125,42 @@
     align-items: center;
     gap: 4px 12px;
   }
-  label small {
+  label small,
+  .test small {
     grid-column: 2;
     color: var(--muted);
     font-size: 11.5px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    align-items: start;
+    gap: 4px 12px;
+  }
+  .checks {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .sub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 22px;
+  }
+  .sub.off {
+    opacity: 0.5;
+  }
+  label.chk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .test {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
   }
   .info {
     display: flex;

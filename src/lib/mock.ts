@@ -186,6 +186,12 @@ let settings: Settings = {
   editor: '',
   terminal: 'auto',
   sidebarWidth: 240,
+  notifyEnabled: true,
+  notifyCommit: true,
+  notifyPush: true,
+  notifyBranch: false,
+  notifyWarn: true,
+  notifyWhenFocused: false,
 }
 
 const t0 = Date.now()
@@ -317,10 +323,19 @@ const delay = <T>(v: T, ms = 60) => new Promise<T>((r) => setTimeout(() => r(v),
 
 export function createMockBackend(): Backend {
   const listeners: ((c: RepoChange) => void)[] = []
-  // AI가 파일을 고치는 것처럼 가끔 변경을 알린다
+  /** 미리보기 중에 "AI가 한" 새 커밋 */
+  const live: ActivityEntry[] = []
+  let tick = 0
+  // AI가 파일을 고치고 가끔 커밋하는 것처럼 변경을 알린다
   setInterval(() => {
+    tick++
     workMtimes['src/lib/auth/login.ts'] = Date.now()
-    for (const l of listeners) l({ root: 'C:/Project/sample-app', worktree: true, git: false })
+    const git = tick % 3 === 0
+    if (git) {
+      const sha = hex(1000 + tick)
+      live.unshift({ time: Math.floor(Date.now() / 1000), refName: 'refs/heads/main', old: main[99], new: sha, message: `commit: 미리보기 커밋 ${tick / 3}`, who: 'Claude', subject: `미리보기 커밋 ${tick / 3}`, oldSubject: null, dropped: 0 })
+    }
+    for (const l of listeners) l({ root: 'C:/Project/sample-app', worktree: true, git })
   }, 20000)
 
   return {
@@ -373,7 +388,7 @@ export function createMockBackend(): Backend {
       return delay(blob(fakeDiff(path, seed)))
     },
     outgoing: (_root, all) => delay(outgoing(all), 150),
-    activity: () => delay(activity()),
+    activity: () => delay([...live, ...activity()]),
     fileHistory: (_root, path, _follow, skip, limit) => delay(fileHistory(path).slice(skip, skip + limit)),
     blame: (_root, path) => delay(blame(path)),
     fileContent: (_root, path) => delay(blob(sampleLines(path).join('\n') + '\n')),
@@ -405,5 +420,10 @@ export function createMockBackend(): Backend {
       console.info('편집기', p)
     },
     pickFolder: () => delay('C:/Project/sample-app'),
+    async notify(title, body) {
+      // 브라우저 미리보기: 브라우저 알림을 허락했으면 그것으로, 아니면 콘솔에
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body })
+      else console.info('[알림]', title, body)
+    },
   }
 }

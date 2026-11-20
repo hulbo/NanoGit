@@ -2,6 +2,7 @@
 
 import { createBackend, errorMessage, type Backend } from './api'
 import { describe, newSince } from './activity'
+import { buildNotices } from './notify'
 import type { ActivityEntry, AppInfo, Commit, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
 import type { MenuEntry } from './components/ContextMenu.svelte'
 
@@ -28,6 +29,12 @@ export const DEFAULT_SETTINGS: Settings = {
   editor: '',
   terminal: 'auto',
   sidebarWidth: 240,
+  notifyEnabled: true,
+  notifyCommit: true,
+  notifyPush: true,
+  notifyBranch: false,
+  notifyWarn: true,
+  notifyWhenFocused: false,
 }
 
 /** 파일 이력 화면을 여는 요청 */
@@ -165,6 +172,7 @@ export class Repo {
       if (list.length) this.lastSeen = list[0]
       if (!notify || !fresh.length) return
       if (!(app.active === this && this.view === 'activity')) this.unseen += fresh.length
+      void app.notifyActivity(this, fresh)
       for (const e of fresh.slice(0, 3).reverse()) {
         const v = describe(e)
         const kind = v.severity === 'danger' ? 'error' : v.severity === 'caution' ? 'warn' : 'info'
@@ -364,6 +372,29 @@ class App {
     this.settings.active = this.activeRoot
     try {
       await this.backend.settingsSave($state.snapshot(this.settings))
+    } catch (e) {
+      this.toast(errorMessage(e), 'error')
+    }
+  }
+
+  /** 새 활동을 Windows 알림으로 (앱을 보고 있으면 앱 안의 알림만) */
+  async notifyActivity(repo: Repo, fresh: ActivityEntry[]) {
+    const s = this.settings
+    if (!s.notifyEnabled) return
+    if (!s.notifyWhenFocused && document.hasFocus()) return
+    for (const n of buildNotices(repo.name, fresh, s)) {
+      try {
+        await this.backend.notify(n.title, n.body)
+      } catch (e) {
+        console.warn(errorMessage(e))
+        return
+      }
+    }
+  }
+
+  async testNotify() {
+    try {
+      await this.backend.notify('NanoGit · 알림 시험', 'AI가 커밋·push하거나 reset 같은 작업을 하면 이렇게 알려 드립니다.')
     } catch (e) {
       this.toast(errorMessage(e), 'error')
     }
