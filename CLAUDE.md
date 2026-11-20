@@ -1,0 +1,30 @@
+# NanoGit — instructions for agents
+
+NanoGit is a light git monitor for Windows (Tauri 2 + Svelte 5 + Rust, the same stack as
+github.com/hulbo/ServicesDashboard). Its user hands git work (commit, push, branch) to AI agents and
+uses NanoGit to **watch** what happened: live working-tree changes, an activity timeline from the
+reflog, commits waiting to be pushed, and an enhanced file history. The layout follows SourceTree.
+The repository is public (github.com/hulbo/NanoGit): tests, samples and docs use made-up names.
+
+## Working here
+- Talk to the user in Korean. UI text, docs and commit messages are Korean too.
+- Personal project: when a change is built, tested and checked, commit and push to `origin main`
+  without asking. Ask first only for destructive git operations.
+- Monitoring comes first. Direct git operations (stage, commit, push, pull, branch, stash) are
+  milestone M3 in `docs/PLANNING.md`; until then the backend runs only read-only git commands plus
+  `fetch`. Keep queries on `GIT_OPTIONAL_LOCKS=0` so they never take `index.lock` from an agent.
+- User-supplied revisions go through `git::check_rev` (no leading `-`); paths always follow `--`.
+
+## Layout
+- `src-tauri/src/git/`: `mod.rs` runs git (no window, timeouts, CP949 fallback), `parse.rs` pure
+  parsers, `query.rs` queries, `reflog.rs` the activity timeline, `model.rs` the IPC data.
+- `src-tauri/src/watch.rs`: notify watcher, batches changes per repo into `repo://changed`.
+- `src/lib/state.svelte.ts`: tabs (`Repo`) and what to refresh on a change; `src/lib/mock.ts` is the
+  browser-preview backend (keep it in step with `api.ts`).
+- Docs: `README.md` front page, `docs/PLANNING.md` plan and milestones, `docs/DEVELOPMENT.md` build
+  and structure. A user-visible change updates README's feature table when it changes the front page.
+
+## Checks before committing
+- `npm run check`, `npm test`, `cargo test --manifest-path src-tauri/Cargo.toml`
+- Look at the change in the browser preview (`npm run dev`, mock backend at http://localhost:1421)
+  or the app (`npm run tauri dev`).

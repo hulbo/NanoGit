@@ -1,0 +1,347 @@
+/* 색은 Services Dashboard와 같은 IntelliJ 계열. 테마는 <html data-theme="dark|light">로 고른다 (시스템 설정은 앱이 읽어 넣는다) */
+:root {
+  color-scheme: dark;
+  --bg: #1e1f22;
+  --panel: #2b2d30;
+  --panel-2: #26282b;
+  --hover: #393b40;
+  --hover-strong: #43454a;
+  --border: #1e1f22;
+  --border-strong: #43454a;
+  --text: #dfe1e5;
+  --text-2: #c4c7cc;
+  --muted: #8c9097;
+  --faint: #6a6e75;
+  --accent: #3574f0;
+  --accent-text: #6f9ff8;
+  --sel: #2e436e;
+  --sel-inactive: #393b40;
+  --ok: #5fb865;
+  --warn: #e2a53a;
+  --err: #f75464;
+  --input-bg: #1e1f22;
+  --input-border: #4e5157;
+
+  --st-added: #5fb865;
+  --st-modified: #6f9ff8;
+  --st-deleted: #f75464;
+  --st-renamed: #c77dbb;
+  --st-untracked: #8c9097;
+  --st-conflict: #e2a53a;
+
+  --diff-add-bg: rgb(95 184 101 / 0.14);
+  --diff-add-mark: rgb(95 184 101 / 0.38);
+  --diff-del-bg: rgb(247 84 100 / 0.13);
+  --diff-del-mark: rgb(247 84 100 / 0.38);
+  --diff-hunk-bg: rgb(53 116 240 / 0.12);
+  --diff-hunk-fg: #8fb2f5;
+  --diff-gutter: #6a6e75;
+
+  --ref-head: #3574f0;
+  --ref-local: #3b8a40;
+  --ref-remote: #7a5ea8;
+  --ref-tag: #9a6b00;
+
+  --lane-0: #6f9ff8;
+  --lane-1: #5fb865;
+  --lane-2: #e2a53a;
+  --lane-3: #c77dbb;
+  --lane-4: #2aacb8;
+  --lane-5: #f2797f;
+  --lane-6: #b3a14e;
+  --lane-7: #8c9be0;
+
+  --font-ui: 'Pretendard', 'Malgun Gothic', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'D2Coding', 'Cascadia Mono', Consolas, 'Malgun Gothic', monospace;
+  --code-size: 12.5px;
+  --code-row: 19px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #f7f8fa;
+  --panel-2: #f0f1f3;
+  --hover: #e8eaee;
+  --hover-strong: #dcdfe4;
+  --border: #e4e6ea;
+  --border-strong: #cfd2d8;
+  --text: #1f2023;
+  --text-2: #3a3c40;
+  --muted: #6c707e;
+  --faint: #9a9da6;
+  --accent: #3574f0;
+  --accent-text: #2a62d4;
+  --sel: #d4e2ff;
+  --sel-inactive: #e3e6eb;
+  --ok: #208a3c;
+  --warn: #b7791f;
+  --err: #d43b4b;
+  --input-bg: #ffffff;
+  --input-border: #c9ccd3;
+
+  --st-added: #208a3c;
+  --st-modified: #2a62d4;
+  --st-deleted: #d43b4b;
+  --st-renamed: #a3389e;
+  --st-untracked: #6c707e;
+  --st-conflict: #b7791f;
+
+  --diff-add-bg: #e6f5e9;
+  --diff-add-mark: #b5e3bf;
+  --diff-del-bg: #fdecee;
+  --diff-del-mark: #f6c2c8;
+  --diff-hunk-bg: #edf3ff;
+  --diff-hunk-fg: #2a62d4;
+  --diff-gutter: #9a9da6;
+
+  --lane-0: #2a62d4;
+  --lane-1: #208a3c;
+  --lane-2: #b7791f;
+  --lane-3: #a3389e;
+  --lane-4: #0a7f8c;
+  --lane-5: #d43b4b;
+  --lane-6: #7d6b00;
+  --lane-7: #5560c9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#app {
+  height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: -2px;
+}
+
+input[type='text'],
+input[type='search'],
+input[type='number'],
+select {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+button.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.ghost.on {
+  background: var(--sel-inactive);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+button.ghost:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+/* 세그먼트 버튼 묶음 */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg button {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seg button + button {
+  border-left: 1px solid var(--border-strong);
+}
+.seg button.on {
+  background: var(--sel);
+  color: var(--text);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 참조 배지 (브랜치·태그) */
+.ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.ref.head {
+  background: var(--ref-head);
+}
+.ref.local {
+  background: var(--ref-local);
+}
+.ref.remote {
+  background: var(--ref-remote);
+}
+.ref.tag {
+  background: var(--ref-tag);
+}
+
+/* 파일 상태 글자 */
+.st {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex: none;
+}
+.st-A {
+  background: var(--st-added);
+}
+.st-M,
+.st-T {
+  background: var(--st-modified);
+}
+.st-D {
+  background: var(--st-deleted);
+}
+.st-R,
+.st-C {
+  background: var(--st-renamed);
+}
+.st-\? {
+  background: var(--st-untracked);
+}
+.st-U {
+  background: var(--st-conflict);
+}
+
+.add-n {
+  color: var(--st-added);
+}
+.del-n {
+  color: var(--st-deleted);
+}
+
+/* 패널 머리줄 */
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex: none;
+  min-width: 0;
+}
+.pane-head .title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pane-head .grow {
+  flex: 1;
+}
