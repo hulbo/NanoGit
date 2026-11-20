@@ -4,7 +4,7 @@
 //! 밖이면 "작업 트리 변화"로 나눠 알린다. 짧은 시간에 몰리는 변경은 묶어서
 //! (조용해진 뒤 300ms, 계속 바뀌어도 최대 1초에 한 번) 저장소마다 한 번만 알린다.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
@@ -61,17 +61,23 @@ pub fn classify(paths: &Paths, p: &Path) -> Option<Kind> {
 }
 
 struct RepoWatch {
+    /// 알림에 쓰는 저장소 이름 (`display(root)`)
+    name: String,
     _watchers: Vec<RecommendedWatcher>,
 }
 
 pub struct WatchHub {
     repos: Mutex<HashMap<String, RepoWatch>>,
     tx: Mutex<Sender<(String, Kind)>>,
+    /// 지금 감시 중인 저장소 이름. 감시를 끈 저장소의 묶여 있던 알림은 내보내지 않는다
+    active: Arc<Mutex<HashSet<String>>>,
 }
 
 impl WatchHub {
     pub fn new(emit: Arc<dyn Fn(Change) + Send + Sync>) -> Arc<Self> {
         let (tx, rx) = mpsc::channel::<(String, Kind)>();
+        let active: Arc<Mutex<HashSet<String>>> = Arc::default();
+        let active_d = active.clone();
         std::thread::Builder::new()
             .name("watch-dispatch".into())
             .spawn(move || {
@@ -98,13 +104,15 @@ impl WatchHub {
                         .collect();
                     for k in due {
                         if let Some((change, _, _)) = pending.remove(&k) {
-                            emit(change);
+                            if active_d.lock().is_ok_and(|a| a.contains(&change.root)) {
+                                emit(change);
+                            }
                         }
                     }
                 }
             })
             .ok();
-        Arc::new(WatchHub { repos: Mutex::new(HashMap::new()), tx: Mutex::new(tx) })
+        Arc::new(WatchHub { repos: Mutex::new(HashMap::new()), tx: Mutex::new(tx), active })
     }
 
     /// 감시할 저장소 목록을 맞춘다. 감시를 시작하지 못한 저장소는 오류 메시지로 돌려준다.
@@ -124,6 +132,9 @@ impl WatchHub {
                 Err(e) => errors.push(format!("{root}: {e}")),
             }
         }
+        if let Ok(mut a) = self.active.lock() {
+            *a = repos.values().map(|w| w.name.clone()).collect();
+        }
         errors
     }
 
@@ -136,6 +147,7 @@ impl WatchHub {
         let paths = Paths { root: loc.root.clone(), git_dirs: git_dirs.clone() };
         let tx = self.tx.lock().map_err(|e| e.to_string())?.clone();
         let name = display(&loc.root);
+        let repo_name = name.clone();
         let handler = move |res: notify::Result<notify::Event>| {
             let Ok(ev) = res else { return };
             if matches!(ev.kind, EventKind::Access(_)) {
@@ -162,7 +174,7 @@ impl WatchHub {
                 watchers.push(w);
             }
         }
-        Ok(RepoWatch { _watchers: watchers })
+        Ok(RepoWatch { name: repo_name, _watchers: watchers })
     }
 }
 
@@ -206,13 +218,17 @@ mod tests {
         std::thread::sleep(Duration::from_millis(500));
         let changes = got.lock().unwrap().clone();
         assert!(!changes.is_empty(), "변경 알림이 와야 함");
-        assert!(changes.len() <= 2, "몰린 변경은 묶여야 함: {changes:?}");
+        // 느린 PC(CI)에서는 변경이 1초 넘게 퍼질 수 있어 묶음이 하나 더 생길 수 있다
+        assert!(changes.len() <= 3, "몰린 변경(6개)은 묶여야 함: {changes:?}");
         assert!(changes.iter().all(|c| c.root == root_s));
         assert!(changes.iter().any(|c| c.worktree));
         assert!(changes.iter().any(|c| c.git));
 
-        // 감시를 끄면 더 오지 않는다
+        // 감시를 끄면 더 오지 않는다 (묶여 있던 알림도 버린다)
+        std::fs::write(root.join("before-off.txt"), "x").unwrap();
         hub.set(&[]);
+        // 이미 내보내는 중이던 알림이 있으면 끝나기를 기다린다
+        std::thread::sleep(Duration::from_millis(150));
         got.lock().unwrap().clear();
         std::fs::write(root.join("after.txt"), "x").unwrap();
         std::thread::sleep(Duration::from_millis(700));
