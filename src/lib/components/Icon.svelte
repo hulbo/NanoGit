@@ -34,6 +34,7 @@
     | 'editor'
     | 'check'
     | 'lines'
+    | 'grid'
 </script>
 
 <script lang="ts">
@@ -145,6 +146,11 @@
     <path d="M10.5 3l2.5 2.5L6 12.5H3.5V10z" />
   {:else if name === 'check'}
     <path d="M3 8.5l3.2 3L13 4.5" />
+  {:else if name === 'grid'}
+    <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" />
+    <rect x="9" y="2.5" width="4.5" height="4.5" rx="1" />
+    <rect x="2.5" y="9" width="4.5" height="4.5" rx="1" />
+    <rect x="9" y="9" width="4.5" height="4.5" rx="1" />
   {:else if name === 'lines'}
     <path d="M2.5 3.5h11M2.5 6.5h11M2.5 9.5h7M2.5 12.5h7" />
     <path d="M12 9v4.5" stroke-width="2" />

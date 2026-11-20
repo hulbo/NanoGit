@@ -1,7 +1,7 @@
 <script lang="ts">
   // 저장소 탭 (소스트리처럼). 바뀌는 중인 저장소는 점이 깜빡인다
   import type { MenuEntry } from './ContextMenu.svelte'
-  import { app } from '../state.svelte'
+  import { app, OVERVIEW } from '../state.svelte'
   import Icon from './Icon.svelte'
 
   let now = $state(Date.now())
@@ -9,6 +9,9 @@
     const t = setInterval(() => (now = Date.now()), 1000)
     return () => clearInterval(t)
   })
+
+  const totalUnseen = $derived(app.tabs.reduce((n, t) => n + t.unseen, 0))
+  const anyLive = $derived(app.tabs.some((t) => now - t.pulse < 4000))
 
   function addMenu(e: MouseEvent) {
     const open = new Set(app.tabs.map((t) => t.root.toLowerCase()))
@@ -34,6 +37,21 @@
 </script>
 
 <div class="tabs" role="tablist">
+  <div
+    class="tab overview"
+    class:active={app.onOverview}
+    role="tab"
+    tabindex="0"
+    aria-selected={app.onOverview}
+    title="모든 저장소 요약 (Ctrl+0)"
+    onclick={() => app.select(OVERVIEW)}
+    onkeydown={(e) => e.key === 'Enter' && app.select(OVERVIEW)}
+  >
+    <span class="dot" class:live={anyLive}></span>
+    <Icon name="grid" size={14} />
+    <span class="name">요약</span>
+    {#if totalUnseen}<span class="badge unseen" title="확인하지 않은 새 활동">{totalUnseen}</span>{/if}
+  </div>
   {#each app.tabs as t (t.root)}
     {@const active = t.root === app.activeRoot}
     {@const live = now - t.pulse < 4000}
@@ -107,6 +125,9 @@
     color: var(--text);
     margin-bottom: -1px;
     height: 30px;
+  }
+  .tab.overview {
+    padding-right: 10px;
   }
   .dot {
     width: 7px;

@@ -177,7 +177,8 @@ let settings: Settings = {
     { path: 'C:/Project/api-server', name: 'api-server' },
   ],
   tabs: ['C:/Project/sample-app', 'C:/Project/api-server'],
-  active: 'C:/Project/sample-app',
+  // ?tab=overview로 열면 요약 화면부터 (문서 스크린샷용)
+  active: typeof location !== 'undefined' && new URLSearchParams(location.search).get('tab') === 'overview' ? '#overview' : 'C:/Project/sample-app',
   theme: 'system',
   fetchMinutes: 0,
   historyScope: 'all',
@@ -204,7 +205,24 @@ const workMtimes: Record<string, number> = {
   'src/lib/api.ts': t0 - 20 * 60000,
 }
 
-const status = (root: string): Status => ({
+const status = (root: string): Status =>
+  root.includes('api')
+    ? {
+        root,
+        branch: 'main',
+        head: hex(602),
+        upstream: 'origin/main',
+        ahead: 2,
+        behind: 1,
+        state: null,
+        staged: [],
+        unstaged: [{ path: 'src/order/OrderController.java', oldPath: null, status: 'M', mtime: t0 - 4 * 60000 }],
+        conflicted: [],
+        truncated: false,
+      }
+    : sampleStatus(root)
+
+const sampleStatus = (root: string): Status => ({
   root,
   branch: 'main',
   head: main[99],
@@ -300,6 +318,27 @@ const activity = (): ActivityEntry[] => {
   ]
 }
 
+/** 두 번째 샘플 저장소(api-server)의 활동 */
+const apiActivity = (): ActivityEntry[] => {
+  const e = (min: number, refName: string, old: string, nw: string, message: string, subject: string): ActivityEntry => ({
+    time: now - min * 60,
+    refName,
+    old,
+    new: nw,
+    message,
+    who: 'Claude',
+    subject,
+    oldSubject: null,
+    dropped: 0,
+  })
+  return [
+    e(4, 'refs/heads/main', hex(601), hex(602), 'commit: 주문 API 응답 시간 기록', '주문 API 응답 시간 기록'),
+    e(18, 'refs/heads/main', hex(600), hex(601), 'commit: 결제 실패 재시도 횟수 설정', '결제 실패 재시도 횟수 설정'),
+    e(52, 'refs/remotes/origin/main', hex(599), hex(600), 'update by push', '헬스 체크 경로 추가'),
+    e(55, 'refs/heads/main', hex(599), hex(600), 'commit: 헬스 체크 경로 추가', '헬스 체크 경로 추가'),
+  ]
+}
+
 function fileHistory(path: string): HistoryEntry[] {
   const out: HistoryEntry[] = []
   for (const n of nodes) {
@@ -390,7 +429,7 @@ export function createMockBackend(): Backend {
       return delay(blob(fakeDiff(path, seed)))
     },
     outgoing: (_root, all) => delay(outgoing(all), 150),
-    activity: () => delay([...live, ...activity()]),
+    activity: (root) => delay(root.includes('api') ? apiActivity() : [...live, ...activity()]),
     fileHistory: (_root, path, _follow, skip, limit) => delay(fileHistory(path).slice(skip, skip + limit)),
     blame: (_root, path) => delay(blame(path)),
     fileContent: (_root, path) => delay(blob(sampleLines(path).join('\n') + '\n')),

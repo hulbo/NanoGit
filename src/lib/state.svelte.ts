@@ -18,6 +18,9 @@ export interface Toast {
 
 const PAGE = 500
 
+/** 요약 화면을 고른 상태의 activeRoot (저장소 경로와 겹치지 않는 값) */
+export const OVERVIEW = '#overview'
+
 export const DEFAULT_SETTINGS: Settings = {
   repos: [],
   tabs: [],
@@ -97,7 +100,8 @@ export class Repo {
   /** push 대기 커밋 수 (추적 브랜치 기준. 없으면 push 대기 화면에서 계산한 값) */
   get aheadCount(): number {
     const cur = this.outgoing?.find((o) => o.current)
-    if (cur) return cur.commits.length
+    // 원격이 없으면 올릴 곳이 없으므로 push 대기로 세지 않는다 (Push 대기 화면에는 "원격 없음"으로 보인다)
+    if (cur) return cur.remote ? cur.commits.length : 0
     return this.status?.ahead ?? 0
   }
 
@@ -208,7 +212,9 @@ export class Repo {
     const tasks: Promise<unknown>[] = [this.refreshStatus()]
     if (c.git) {
       tasks.push(this.refreshActivity(true))
-      if (this.loadedOnce) tasks.push(this.refreshRefs(), this.loadLog(true), this.refreshOutgoing())
+      if (this.loadedOnce) tasks.push(this.refreshRefs(), this.loadLog(true))
+      // 요약 화면에서 읽은 뒤쪽 탭의 push 대기도 계속 맞춘다
+      if (this.loadedOnce || this.outgoing) tasks.push(this.refreshOutgoing())
     }
     await Promise.all(tasks)
   }
@@ -254,6 +260,11 @@ class App {
     return this.tabs.find((t) => t.root === this.activeRoot) ?? null
   }
 
+  /** 요약 화면을 보고 있음 */
+  get onOverview(): boolean {
+    return this.activeRoot === OVERVIEW && this.tabs.length > 0
+  }
+
   async init() {
     this.backend = await createBackend()
     try {
@@ -267,7 +278,8 @@ class App {
       const entry = this.settings.repos.find((r) => r.path === root)
       this.tabs.push(new Repo(root, entry?.name ?? root.split('/').pop() ?? root, this.settings.historyScope))
     }
-    this.activeRoot = this.tabs.some((t) => t.root === this.settings.active) ? this.settings.active : (this.tabs[0]?.root ?? null)
+    const saved = this.settings.active
+    this.activeRoot = this.tabs.some((t) => t.root === saved) || (saved === OVERVIEW && this.tabs.length) ? saved : (this.tabs[0]?.root ?? null)
     await this.backend.onChanged((c) => {
       const repo = this.tabs.find((t) => t.root.toLowerCase() === c.root.toLowerCase())
       if (repo) void repo.onChange(c)
@@ -370,11 +382,12 @@ class App {
     void this.persist()
   }
 
+  /** 요약 → 첫 탭 → … → 마지막 탭 → 요약 순서로 돈다 */
   moveTab(delta: number) {
-    if (this.tabs.length < 2) return
-    const i = this.tabs.findIndex((t) => t.root === this.activeRoot)
-    const next = this.tabs[(i + delta + this.tabs.length) % this.tabs.length]
-    this.select(next.root)
+    const seq = [OVERVIEW, ...this.tabs.map((t) => t.root)]
+    if (seq.length < 2) return
+    const i = Math.max(0, seq.indexOf(this.activeRoot ?? ''))
+    this.select(seq[(i + delta + seq.length) % seq.length])
   }
 
   forgetRepo(path: string) {

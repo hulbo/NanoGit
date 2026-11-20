@@ -6,6 +6,7 @@
   import HistoryView from './lib/components/HistoryView.svelte'
   import Icon from './lib/components/Icon.svelte'
   import OutgoingView from './lib/components/OutgoingView.svelte'
+  import OverviewView from './lib/components/OverviewView.svelte'
   import QuickOpen from './lib/components/QuickOpen.svelte'
   import RepoTabs from './lib/components/RepoTabs.svelte'
   import SettingsDialog from './lib/components/SettingsDialog.svelte'
@@ -14,7 +15,7 @@
   import Toasts from './lib/components/Toasts.svelte'
   import Toolbar from './lib/components/Toolbar.svelte'
   import Welcome from './lib/components/Welcome.svelte'
-  import { app, type View } from './lib/state.svelte'
+  import { app, OVERVIEW, type View } from './lib/state.svelte'
   import { traySummary } from './lib/tray'
 
   void app.init()
@@ -49,6 +50,11 @@
     if (e.key === 'Tab') {
       e.preventDefault()
       app.moveTab(e.shiftKey ? -1 : 1)
+      return
+    }
+    if (e.key === '0' && app.tabs.length) {
+      e.preventDefault()
+      app.select(OVERVIEW)
       return
     }
     if (!r) return
@@ -89,7 +95,15 @@
     {#if app.tabs.length}
       <RepoTabs />
     {/if}
-    {#if repo}
+    {#if app.onOverview}
+      <div class="overview"><OverviewView /></div>
+      <footer>
+        <span>저장소 {app.tabs.length}개</span>
+        <span class="grow"></span>
+        <span class="watch" title="파일·git 변화를 실시간으로 감시합니다"><span class="live"></span>감시 중</span>
+        <span class="muted">NanoGit {app.info?.version ?? ''}</span>
+      </footer>
+    {:else if repo}
       {#key repo.root}
         <Toolbar {repo} />
         <div class="body">
@@ -167,6 +181,10 @@
   }
   .body {
     display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .overview {
     flex: 1;
     min-height: 0;
   }

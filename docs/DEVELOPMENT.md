@@ -32,13 +32,13 @@ npm run tauri build   # 설치본 빌드 → src-tauri/target/release/bundle/nsi
 
 ```powershell
 npm run check                                   # Svelte·TypeScript 타입 검사
-npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 트레이 요약, 시간 표시, 파일 찾기)
+npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 트레이·저장소 요약, 시간 표시, 파일 찾기)
 cargo test --manifest-path src-tauri/Cargo.toml # 백엔드 테스트 (파서 + 실제 git 저장소로 조회·reflog·감시)
 ```
 
 ## 브라우저 미리보기
 
-`npm run dev`로 띄운 화면(`http://localhost:1421`)을 일반 브라우저에서 열면 **가짜 백엔드**(`src/lib/mock.ts`)로 동작합니다. 샘플 저장소 두 개(병합·이름 변경·reset·amend·push가 들어 있는 이력)가 열려 있어 화면만 고칠 때 편합니다. 문서의 스크린샷도 이 화면으로 찍었습니다.
+`npm run dev`로 띄운 화면(`http://localhost:1421`)을 일반 브라우저에서 열면 **가짜 백엔드**(`src/lib/mock.ts`)로 동작합니다. 샘플 저장소 두 개(병합·이름 변경·reset·amend·push가 들어 있는 이력)가 열려 있어 화면만 고칠 때 편합니다. `?tab=overview`를 붙이면 저장소 요약 화면부터 엽니다. 문서의 스크린샷도 이 화면으로 찍었습니다.
 
 ## 설정 폴더 분리
 
@@ -58,6 +58,7 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/activity.ts            reflog 항목 → 활동 종류·설명·위험도
   lib/notify.ts              새 활동 → Windows 알림 (종류별 켜기·끄기, 많으면 묶기)
   lib/tray.ts                트레이 툴팁·메뉴에 보일 저장소 요약
+  lib/overview.ts            저장소 요약 화면: 마지막 변화, 최근 바뀐 파일, 경고 수, 전체 활동 합치기
   lib/fuzzy.ts               파일 찾기 퍼지 검색
   lib/format.ts              시간·경로 표시
   lib/menus.ts               파일·커밋 우클릭 메뉴
