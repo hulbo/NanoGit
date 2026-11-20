@@ -192,6 +192,8 @@ let settings: Settings = {
   notifyBranch: false,
   notifyWarn: true,
   notifyWhenFocused: false,
+  closeToTray: true,
+  startWithWindows: false,
 }
 
 const t0 = Date.now()
@@ -425,5 +427,12 @@ export function createMockBackend(): Backend {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body })
       else console.info('[알림]', title, body)
     },
+    async trayUpdate(summary) {
+      document.title = summary.tooltip
+    },
+    async onTray() {
+      return () => {}
+    },
+    async windowShow() {},
   }
 }

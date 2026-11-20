@@ -3,6 +3,7 @@
 import { createBackend, errorMessage, type Backend } from './api'
 import { describe, newSince } from './activity'
 import { buildNotices } from './notify'
+import type { TraySummary } from './tray'
 import type { ActivityEntry, AppInfo, Commit, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
 import type { MenuEntry } from './components/ContextMenu.svelte'
 
@@ -35,6 +36,8 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyBranch: false,
   notifyWarn: true,
   notifyWhenFocused: false,
+  closeToTray: true,
+  startWithWindows: false,
 }
 
 /** 파일 이력 화면을 여는 요청 */
@@ -245,6 +248,7 @@ class App {
   menu = $state<{ x: number; y: number; items: MenuEntry[] } | null>(null)
   private toastId = 0
   private fetchTimer: ReturnType<typeof setInterval> | null = null
+  private trayTimer: ReturnType<typeof setTimeout> | undefined
 
   get active(): Repo | null {
     return this.tabs.find((t) => t.root === this.activeRoot) ?? null
@@ -267,6 +271,17 @@ class App {
     await this.backend.onChanged((c) => {
       const repo = this.tabs.find((t) => t.root.toLowerCase() === c.root.toLowerCase())
       if (repo) void repo.onChange(c)
+    })
+    await this.backend.onTray((a) => {
+      if (a.kind === 'openRepo') {
+        if (this.tabs.some((t) => t.root === a.root)) this.select(a.root)
+      } else if (a.kind === 'toggleNotify') {
+        this.settings.notifyEnabled = !this.settings.notifyEnabled
+        void this.persist()
+        this.toast(this.settings.notifyEnabled ? '알림을 켰습니다' : '알림을 껐습니다 (트레이 메뉴나 설정에서 다시 켤 수 있습니다)', 'info')
+      } else if (a.kind === 'fetchAll') {
+        void this.fetchAll(false)
+      }
     })
     await this.syncWatch()
     // 백그라운드 탭도 배지(변경 수·push 대기)를 보여 주도록 상태만 읽는다
@@ -367,14 +382,25 @@ class App {
     void this.persist()
   }
 
-  async persist() {
+  /** 설정 저장. 실패하면 알리고 false */
+  async persist(): Promise<boolean> {
     this.settings.tabs = this.tabs.map((t) => t.root)
     this.settings.active = this.activeRoot
     try {
       await this.backend.settingsSave($state.snapshot(this.settings))
+      return true
     } catch (e) {
       this.toast(errorMessage(e), 'error')
+      return false
     }
+  }
+
+  /** 트레이 툴팁·메뉴를 갱신한다 (몰아서 한 번) */
+  queueTray(summary: TraySummary) {
+    clearTimeout(this.trayTimer)
+    this.trayTimer = setTimeout(() => {
+      this.backend?.trayUpdate(summary).catch(() => {})
+    }, 300)
   }
 
   /** 새 활동을 Windows 알림으로 (앱을 보고 있으면 앱 안의 알림만) */

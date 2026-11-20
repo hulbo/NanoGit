@@ -15,6 +15,7 @@
   import Toolbar from './lib/components/Toolbar.svelte'
   import Welcome from './lib/components/Welcome.svelte'
   import { app, type View } from './lib/state.svelte'
+  import { traySummary } from './lib/tray'
 
   void app.init()
 
@@ -24,6 +25,17 @@
 
   $effect(() => {
     sideWidth = app.settings.sidebarWidth
+  })
+
+  // 트레이 툴팁·메뉴: 저장소마다 변경 수·push 대기·새 활동
+  $effect(() => {
+    if (!app.ready) return
+    app.queueTray(
+      traySummary(
+        app.tabs.map((t) => ({ root: t.root, name: t.name, branch: t.status?.branch ?? null, changes: t.changeCount, ahead: t.aheadCount, unseen: t.unseen })),
+        app.settings.notifyEnabled,
+      ),
+    )
   })
 
   function onkey(e: KeyboardEvent) {

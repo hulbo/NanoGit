@@ -227,7 +227,14 @@ export interface Settings {
   notifyWarn: boolean
   /** 앱을 보고 있을 때도 알림 (끄면 앱 안의 알림만) */
   notifyWhenFocused: boolean
+  /** 창을 닫으면 트레이로 숨기고 감시를 계속 */
+  closeToTray: boolean
+  /** Windows 시작 시 트레이로 실행 */
+  startWithWindows: boolean
 }
+
+/** 트레이 메뉴에서 고른 동작 */
+export type TrayAction = { kind: 'openRepo'; root: string } | { kind: 'toggleNotify' } | { kind: 'fetchAll' }
 
 export interface AppInfo {
   version: string

@@ -43,6 +43,10 @@ pub struct Settings {
     pub notify_warn: bool,
     /// 앱을 보고 있을 때도 알림
     pub notify_when_focused: bool,
+    /// 창을 닫으면 트레이로 숨기고 감시를 계속한다
+    pub close_to_tray: bool,
+    /// Windows 시작 시 트레이로 실행
+    pub start_with_windows: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +69,8 @@ impl Default for Settings {
             notify_branch: false,
             notify_warn: true,
             notify_when_focused: false,
+            close_to_tray: true,
+            start_with_windows: false,
         }
     }
 }
@@ -143,6 +149,7 @@ mod tests {
         assert_eq!(s.terminal, "auto");
         // 알림 설정이 없던 파일도 기본값(켜짐)으로 읽는다
         assert!(s.notify_enabled && s.notify_warn && !s.notify_branch);
+        assert!(s.close_to_tray && !s.start_with_windows);
 
         // 깨진 파일
         std::fs::write(store.dir().join("settings.json"), "{").unwrap();

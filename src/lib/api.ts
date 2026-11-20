@@ -18,7 +18,9 @@ import type {
   Settings,
   Status,
   TextBlob,
+  TrayAction,
 } from './types'
+import type { TraySummary } from './tray'
 
 export interface Backend {
   readonly isMock: boolean
@@ -51,6 +53,11 @@ export interface Backend {
   pickFolder(): Promise<string | null>
   /** Windows 알림 */
   notify(title: string, body: string): Promise<void>
+  /** 트레이 툴팁·메뉴 갱신 */
+  trayUpdate(summary: TraySummary): Promise<void>
+  onTray(cb: (a: TrayAction) => void): Promise<() => void>
+  /** 트레이에 숨은 창을 보이게 */
+  windowShow(): Promise<void>
 }
 
 export function errorMessage(e: unknown): string {
@@ -99,6 +106,9 @@ async function createTauriBackend(): Promise<Backend> {
     openTerminal: (root) => call('open_terminal', { root }),
     openEditor: (path) => call('open_editor', { path }),
     notify: (title, body) => call('notify_send', { title, body }),
+    trayUpdate: (summary) => call('tray_update', { summary }),
+    onTray: (cb) => listen<TrayAction>('tray://action', (e) => cb(e.payload)),
+    windowShow: () => call('window_show'),
     async pickFolder() {
       const r = await dialog.open({ directory: true, multiple: false, title: '저장소 폴더 선택' })
       return typeof r === 'string' ? r : null

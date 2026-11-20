@@ -20,7 +20,8 @@
         "minHeight": 560,
         "resizable": true,
         "center": true,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "visible": false
       }
     ],
     "security": {
@@ -29,7 +30,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "shortDescription": "AI의 git 작업을 지켜보는 git 모니터",
     "longDescription": "AI가 한 커밋·push·reset을 실시간으로 보여 주고, push 대기 커밋과 파일 이력을 소스트리 같은 화면으로 확인하는 가벼운 git 모니터",
     "icon": [
@@ -41,7 +44,10 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["Korean", "English"],
+        "languages": [
+          "Korean",
+          "English"
+        ],
         "displayLanguageSelector": false
       }
     }

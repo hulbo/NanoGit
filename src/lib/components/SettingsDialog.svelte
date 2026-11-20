@@ -11,6 +11,16 @@
     void app.persist()
   }
 
+  /** Windows 시작 시 실행: 저장할 때 레지스트리에 등록하므로 실패하면 되돌린다 */
+  async function toggleAutostart(e: Event) {
+    const el = e.currentTarget as HTMLInputElement
+    s.startWithWindows = el.checked
+    if (!(await app.persist())) {
+      s.startWithWindows = !el.checked
+      el.checked = s.startWithWindows
+    }
+  }
+
   function close() {
     save()
     app.settingsOpen = false
@@ -52,6 +62,14 @@
           <button class="ghost on" disabled={!s.notifyEnabled} onclick={() => app.testNotify()}><Icon name="check" size={13} />알림 시험</button>
           <small>여러 개가 한꺼번에 생기면 묶어서 알립니다</small>
         </div>
+      </div>
+    </div>
+    <div class="row">
+      <span>트레이</span>
+      <div class="checks">
+        <label class="chk"><input type="checkbox" bind:checked={s.closeToTray} onchange={save} />창을 닫으면 트레이로 숨기고 감시 계속</label>
+        <label class="chk"><input type="checkbox" checked={s.startWithWindows} onchange={toggleAutostart} />Windows 시작 시 트레이로 실행</label>
+        <small>트레이 아이콘: 클릭하면 창을 열고, 우클릭 메뉴에서 저장소별 상태·알림 켜고 끄기·fetch·종료. 새 활동이 있으면 빨간 점</small>
       </div>
     </div>
     <label>
@@ -126,6 +144,7 @@
     gap: 4px 12px;
   }
   label small,
+  .checks small,
   .test small {
     grid-column: 2;
     color: var(--muted);

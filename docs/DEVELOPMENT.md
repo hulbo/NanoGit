@@ -32,7 +32,7 @@ npm run tauri build   # 설치본 빌드 → src-tauri/target/release/bundle/nsi
 
 ```powershell
 npm run check                                   # Svelte·TypeScript 타입 검사
-npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 시간 표시, 파일 찾기)
+npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 트레이 요약, 시간 표시, 파일 찾기)
 cargo test --manifest-path src-tauri/Cargo.toml # 백엔드 테스트 (파서 + 실제 git 저장소로 조회·reflog·감시)
 ```
 
@@ -57,6 +57,7 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/diff.ts                unified diff 해석, 통합·나란히 보기, 바뀐 부분 강조
   lib/activity.ts            reflog 항목 → 활동 종류·설명·위험도
   lib/notify.ts              새 활동 → Windows 알림 (종류별 켜기·끄기, 많으면 묶기)
+  lib/tray.ts                트레이 툴팁·메뉴에 보일 저장소 요약
   lib/fuzzy.ts               파일 찾기 퍼지 검색
   lib/format.ts              시간·경로 표시
   lib/menus.ts               파일·커밋 우클릭 메뉴
@@ -72,6 +73,7 @@ src-tauri/src/               백엔드 (Rust, Tauri 2)
   git/model.rs               화면으로 보내는 데이터
   watch.rs                   저장소 파일 감시와 변화 묶기
   store.rs                   설정 파일
+  tray.rs                    트레이 아이콘·메뉴, 창 닫기 → 트레이, Windows 시작 시 실행(HKCU Run, --tray)
   shell.rs                   터미널·편집기 열기
 docs/                        기획서, 개발 가이드, 스크린샷
 ```

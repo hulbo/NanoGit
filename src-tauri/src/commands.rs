@@ -59,9 +59,25 @@ pub fn settings_get(core: Core<'_>) -> Result<Settings, String> {
 
 #[tauri::command]
 pub fn settings_save(core: Core<'_>, settings: Settings) -> Result<(), String> {
+    let was_autostart = core.settings.lock().map_err(|e| e.to_string())?.start_with_windows;
+    if settings.start_with_windows != was_autostart {
+        crate::tray::set_autostart(settings.start_with_windows)?;
+    }
     core.store.save(&settings)?;
     *core.settings.lock().map_err(|e| e.to_string())? = settings;
     Ok(())
+}
+
+/// 트레이 툴팁·메뉴·아이콘 갱신 (화면이 계산한 요약)
+#[tauri::command]
+pub fn tray_update(app: tauri::AppHandle, summary: crate::tray::TraySummary) -> Result<(), String> {
+    crate::tray::update(&app, summary)
+}
+
+/// 창 보이기 (알림의 "보기" 등)
+#[tauri::command]
+pub fn window_show(app: tauri::AppHandle) {
+    crate::tray::show_main(&app);
 }
 
 #[derive(Serialize)]
