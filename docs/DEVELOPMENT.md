@@ -38,7 +38,7 @@ cargo test --manifest-path src-tauri/Cargo.toml # 백엔드 테스트 (파서 + 
 
 ## 브라우저 미리보기
 
-`npm run dev`로 띄운 화면(`http://localhost:1421`)을 일반 브라우저에서 열면 **가짜 백엔드**(`src/lib/mock.ts`)로 동작합니다. 샘플 저장소 두 개(병합·이름 변경·reset·amend·push가 들어 있는 이력)가 열려 있어 화면만 고칠 때 편합니다. `?tab=overview`를 붙이면 저장소 요약 화면부터 엽니다. 문서의 스크린샷도 이 화면으로 찍었습니다.
+`npm run dev`로 띄운 화면(`http://localhost:1421`)을 일반 브라우저에서 열면 **가짜 백엔드**(`src/lib/mock.ts`)로 동작합니다. 샘플 저장소 두 개(병합·이름 변경·reset·amend·push가 들어 있는 이력)가 열려 있어 화면만 고칠 때 편합니다. `?tab=overview`를 붙이면 저장소 요약 화면부터, `?view=status`를 붙이면 파일 상태부터 엽니다. 미리보기에서도 스테이지·커밋·push는 화면에 반영되고(가짜), 나머지 조작은 흉내만 냅니다. 문서의 스크린샷도 이 화면으로 찍었습니다.
 
 ## 설정 폴더 분리
 
@@ -61,15 +61,18 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/overview.ts            저장소 요약 화면: 마지막 변화, 최근 바뀐 파일, 경고 수, 전체 활동 합치기
   lib/fuzzy.ts               파일 찾기 퍼지 검색
   lib/format.ts              시간·경로 표시
-  lib/menus.ts               파일·커밋 우클릭 메뉴
+  lib/menus.ts               파일·커밋·브랜치·태그·stash 우클릭 메뉴
+  lib/actions.ts             직접 조작 흐름 (확인·입력 대화상자 → 조작 → 알림)
+  lib/dialog.ts              조작 대화상자(OpDialog)의 입력 칸 모양
   lib/components/            RepoTabs, Toolbar, Sidebar, HistoryView, StatusView, ActivityView,
-                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, ...
+                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, OpDialog, ...
 src-tauri/src/               백엔드 (Rust, Tauri 2)
   lib.rs                     앱 시작, 명령 등록
   commands.rs                IPC 명령 (모두 별도 스레드에서 git 실행)
   git/mod.rs                 git 찾기·실행(창 없이, 제한 시간, GIT_OPTIONAL_LOCKS=0), 저장소 찾기, 인코딩
   git/parse.rs               log·status·raw/numstat·blame·reflog 출력 해석
   git/query.rs               조회: 상태, 참조, 히스토리, 커밋, diff, push 대기, 파일 이력, blame, 줄 이력
+  git/ops.rs                 직접 조작: 스테이지·헝크·버리기(휴지통), 커밋, push·pull, 브랜치·병합·stash·태그
   git/reflog.rs              활동 타임라인 (reflog 파일 직접 읽기, 버려진 커밋 수)
   git/model.rs               화면으로 보내는 데이터
   watch.rs                   저장소 파일 감시와 변화 묶기
@@ -81,7 +84,12 @@ docs/                        기획서, 개발 가이드, 스크린샷
 
 ## 원칙
 
-- **1차는 읽기 전용**: fetch를 빼면 저장소를 바꾸는 git 명령을 실행하지 않습니다. 조회는 `GIT_OPTIONAL_LOCKS=0`으로 실행해 AI가 실행 중인 git 명령과 `index.lock`으로 부딪히지 않게 합니다.
+- **감시가 먼저**: 조회(`query.rs`, `reflog.rs`)는 저장소를 바꾸지 않고 `GIT_OPTIONAL_LOCKS=0`으로 실행해 AI가 실행 중인 git 명령과 `index.lock`으로 부딪히지 않게 합니다.
+- **조작은 `git/ops.rs`에만**: IPC 명령은 `git_op` 하나이고, 화면에서 사용자가 고르고 확인한 것만 보냅니다. 감시 전용 모드(`readOnly`)면 백엔드가 거부하고, 한 저장소에서는 조작을 한 번에 하나만 실행합니다.
+  - 편집기를 띄우지 않습니다(`GIT_EDITOR=true`). 창 없는 git이 편집기를 기다리며 멈추지 않게 합니다.
+  - 경로는 `:(literal)`을 붙여 표준 입력으로 넘깁니다(`--pathspec-from-file`). `GIT_LITERAL_PATHSPECS`는 `stash -u`가 새 파일을 치우지 못하게 해서 쓰지 않습니다.
+  - 작업 트리 파일을 버리거나 덮어쓰기 전에 지금 파일을 **휴지통**에 남깁니다 (테스트에서는 그냥 지움).
+  - 강제 push는 `--force-with-lease`만 씁니다. reset처럼 이력을 지우는 조작은 아직 넣지 않았습니다.
 - 사용자가 준 리비전은 `-`로 시작하면 거부하고(`check_rev`), 경로는 항상 `--` 뒤에 넘깁니다.
 - 테스트·샘플·문서에는 지어낸 이름만 씁니다.
 

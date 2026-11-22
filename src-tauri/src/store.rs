@@ -47,6 +47,12 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// Windows 시작 시 트레이로 실행
     pub start_with_windows: bool,
+    /// 감시 전용: 저장소를 바꾸는 조작(커밋·push 등)을 막고 버튼을 숨긴다
+    pub read_only: bool,
+    /// pull 방식: merge, rebase, ff-only
+    pub pull_mode: String,
+    /// 커밋한 뒤 바로 push
+    pub commit_push: bool,
 }
 
 impl Default for Settings {
@@ -71,6 +77,9 @@ impl Default for Settings {
             notify_when_focused: false,
             close_to_tray: true,
             start_with_windows: false,
+            read_only: false,
+            pull_mode: "merge".into(),
+            commit_push: false,
         }
     }
 }

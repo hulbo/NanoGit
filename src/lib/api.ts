@@ -9,6 +9,7 @@ import type {
   CommitDetail,
   DiffOptions,
   DiffTarget,
+  GitOp,
   HistoryEntry,
   LineHistoryEntry,
   LogQuery,
@@ -43,6 +44,8 @@ export interface Backend {
   lineHistory(root: string, path: string, start: number, end: number, rev?: string | null): Promise<LineHistoryEntry[]>
   files(root: string, rev?: string | null): Promise<string[]>
   fetch(root: string): Promise<string>
+  /** 저장소를 바꾸는 조작. git이 남긴 글을 돌려준다 (실패하면 그 글로 던진다) */
+  op(root: string, op: GitOp): Promise<string>
   /** 감시할 저장소 목록. 감시를 시작하지 못한 저장소의 오류를 돌려준다 */
   watch(roots: string[]): Promise<string[]>
   onChanged(cb: (c: RepoChange) => void): Promise<() => void>
@@ -99,6 +102,7 @@ async function createTauriBackend(): Promise<Backend> {
     lineHistory: (root, path, start, end, rev) => call('line_history', { root, path, start, end, rev: rev ?? null }),
     files: (root, rev) => call('files_list', { root, rev: rev ?? null }),
     fetch: (root) => call('fetch', { root }),
+    op: (root, op) => call('git_op', { root, op }),
     watch: (roots) => call('watch_set', { roots }),
     onChanged: (cb) => listen<RepoChange>('repo://changed', (e) => cb(e.payload)),
     openPath: (path) => call('open_path', { path }),

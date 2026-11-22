@@ -35,6 +35,11 @@
     | 'check'
     | 'lines'
     | 'grid'
+    | 'minus'
+    | 'trash'
+    | 'merge'
+    | 'pull'
+    | 'undo'
 </script>
 
 <script lang="ts">
@@ -146,6 +151,21 @@
     <path d="M10.5 3l2.5 2.5L6 12.5H3.5V10z" />
   {:else if name === 'check'}
     <path d="M3 8.5l3.2 3L13 4.5" />
+  {:else if name === 'minus'}
+    <path d="M3 8h10" />
+  {:else if name === 'trash'}
+    <path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 8.6c0 .5.4.9.9.9h4.8c.5 0 .9-.4.9-.9l.7-8.6M6.7 7v4.5M9.3 7v4.5" />
+  {:else if name === 'merge'}
+    <circle cx="4.5" cy="3.5" r="1.5" />
+    <circle cx="4.5" cy="12.5" r="1.5" />
+    <circle cx="11.5" cy="8" r="1.5" />
+    <path d="M4.5 5v6M4.5 5c0 2.4 2.8 3 5.5 3" />
+  {:else if name === 'pull'}
+    <path d="M8 3v9.5M4.2 8.8L8 12.6l3.8-3.8" />
+    <path d="M3 2.5h10" />
+  {:else if name === 'undo'}
+    <path d="M5.5 3.5L2.5 6.5l3 3" />
+    <path d="M2.5 6.5H10a3.5 3.5 0 0 1 0 7H7" />
   {:else if name === 'grid'}
     <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" />
     <rect x="9" y="2.5" width="4.5" height="4.5" rx="1" />

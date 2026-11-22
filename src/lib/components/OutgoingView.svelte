@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Push 대기: 아직 push하지 않은 커밋과 바뀐 파일 (IntelliJ push 대화상자처럼)
+  // Push 대기: 아직 push하지 않은 커밋과 바뀐 파일 (IntelliJ push 대화상자처럼). 확인한 뒤 여기서 바로 push
+  import * as act from '../actions'
   import { errorMessage } from '../api'
   import { shortDate, short } from '../format'
   import { commitMenu, fileMenu } from '../menus'
@@ -104,6 +105,16 @@
     <button class="ghost" class:on={repo.outgoingAll} onclick={toggleAll}>모든 브랜치</button>
     <button class="ghost" title="원격 상태를 새로 가져와 다시 비교" onclick={() => app.fetch(repo)}><Icon name="fetch" size={14} />Fetch</button>
     <button class="ghost" title="다시 확인" onclick={() => repo.refreshOutgoing()}><Icon name="refresh" size={14} /></button>
+    {#if app.canWrite && branch?.remote}
+      <button
+        class="pushbtn"
+        disabled={!!repo.busy || (!branch.commits.length && !branch.newBranch)}
+        title="{targetText(branch)} — 올라갈 커밋을 한 번 더 보여 준 뒤 push"
+        onclick={() => act.push(repo, branch)}
+      >
+        <Icon name="push" size={14} />{repo.busy === 'push' ? 'push하는 중…' : `Push ${branch.branch}`}
+      </button>
+    {/if}
   </div>
   <div class="main">
     <Split key="outgoing" initial={0.38} min={240}>
@@ -123,7 +134,10 @@
               <div class="note warn">원격 저장소가 없습니다.</div>
             {/if}
             {#if b.behind > 0}
-              <div class="note warn"><Icon name="warning" size={13} /><span>원격에 내가 없는 커밋이 {b.behind}개 있습니다. 이대로 push하면 거부될 수 있습니다 (먼저 pull 필요).</span></div>
+              <div class="note warn">
+                <Icon name="warning" size={13} /><span>원격에 내가 없는 커밋이 {b.behind}개 있습니다. 이대로 push하면 거부될 수 있습니다 (먼저 pull 필요).</span>
+                {#if app.canWrite && b.current}<button class="ghost" disabled={!!repo.busy} onclick={() => act.pull(repo)}><Icon name="pull" size={13} />Pull</button>{/if}
+              </div>
             {/if}
             {#each b.commits as c (c.sha)}
               <button
@@ -180,6 +194,26 @@
 </div>
 
 <style>
+  .pushbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 4px;
+    padding: 3px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pushbtn:disabled {
+    border-color: var(--border-strong);
+    background: var(--hover);
+    color: var(--muted);
+    cursor: default;
+  }
   .out {
     display: flex;
     flex-direction: column;

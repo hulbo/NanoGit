@@ -1,5 +1,6 @@
 //! 화면에서 부르는 IPC 명령. git 실행은 시간이 걸리므로 모두 별도 스레드에서 한다.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -7,7 +8,8 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::git::model::*;
-use crate::git::{Git, display, find_repo};
+use crate::git::ops::Op;
+use crate::git::{Git, display, find_repo, norm};
 use crate::store::{Settings, Store};
 use crate::watch::WatchHub;
 
@@ -17,6 +19,33 @@ pub struct AppCore {
     pub store: Store,
     pub settings: Mutex<Settings>,
     pub hub: Arc<WatchHub>,
+    /// 조작이 진행 중인 저장소 (한 저장소에 조작 하나씩)
+    pub busy: Arc<Mutex<HashSet<String>>>,
+}
+
+/// 저장소 하나를 조작하는 동안 잡아 두는 표시. 끝나면(버려지면) 풀린다
+struct BusyGuard {
+    set: Arc<Mutex<HashSet<String>>>,
+    key: String,
+}
+
+impl BusyGuard {
+    fn take(set: &Arc<Mutex<HashSet<String>>>, root: &str) -> Result<Self, String> {
+        let key = norm(Path::new(root));
+        let mut s = set.lock().map_err(|e| e.to_string())?;
+        if !s.insert(key.clone()) {
+            return Err("이 저장소에서 다른 조작이 진행 중입니다. 끝난 뒤 다시 해 보세요".into());
+        }
+        Ok(BusyGuard { set: set.clone(), key })
+    }
+}
+
+impl Drop for BusyGuard {
+    fn drop(&mut self) {
+        if let Ok(mut s) = self.set.lock() {
+            s.remove(&self.key);
+        }
+    }
 }
 
 type Core<'a> = State<'a, Arc<AppCore>>;
@@ -161,6 +190,20 @@ pub async fn line_history(root: String, path: String, start: u32, end: u32, rev:
 #[tauri::command]
 pub async fn files_list(root: String, rev: Option<String>) -> Result<Vec<String>, String> {
     blocking(move || open(&root)?.files(rev.as_deref())).await
+}
+
+/// 저장소를 바꾸는 조작 (커밋·push·스테이지 등). git이 남긴 글을 돌려준다
+#[tauri::command]
+pub async fn git_op(core: Core<'_>, root: String, op: Op) -> Result<String, String> {
+    if core.settings.lock().map_err(|e| e.to_string())?.read_only {
+        return Err("감시 전용 모드라 저장소를 바꾸지 않습니다. 설정에서 감시 전용 모드를 끄세요".into());
+    }
+    let busy = core.busy.clone();
+    blocking(move || {
+        let _guard = BusyGuard::take(&busy, &root)?;
+        Git::open_write(Path::new(&root))?.apply_op(&op)
+    })
+    .await
 }
 
 #[tauri::command]

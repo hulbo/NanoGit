@@ -13,7 +13,7 @@
 <script lang="ts">
   // 바뀐 파일 목록 (목록 / 트리). 고르면 onselect, 우클릭은 oncontext
   import { basename, dirname, relative, statusName } from '../format'
-  import Icon from './Icon.svelte'
+  import Icon, { type IconName } from './Icon.svelte'
 
   let {
     files,
@@ -24,6 +24,7 @@
     tree = false,
     showTime = false,
     now = Date.now(),
+    action,
   }: {
     files: ListFile[]
     selected?: string | null
@@ -33,6 +34,8 @@
     tree?: boolean
     showTime?: boolean
     now?: number
+    /** 줄마다 마우스를 올리면 보이는 버튼 (스테이지·언스테이지). 스페이스 키로도 실행 */
+    action?: { icon: IconName; title: string; run: (f: ListFile) => void }
   } = $props()
 
   interface Row {
@@ -70,6 +73,14 @@
   }
 
   function onkey(e: KeyboardEvent) {
+    if (e.key === ' ' && action) {
+      const f = files.find((x) => x.path === selected)
+      if (f) {
+        e.preventDefault()
+        action.run(f)
+      }
+      return
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     e.preventDefault()
     const list = rows.filter((r) => r.file).map((r) => r.file!)
@@ -118,12 +129,45 @@
         {:else if f.additions != null || f.deletions != null}
           <span class="num mono"><span class="add-n">+{f.additions ?? 0}</span> <span class="del-n">-{f.deletions ?? 0}</span></span>
         {/if}
+        {#if action}
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
+          <span
+            class="act"
+            role="button"
+            title="{action.title} (스페이스)"
+            onclick={(e) => {
+              e.stopPropagation()
+              action.run(f)
+            }}
+            ondblclick={(e) => e.stopPropagation()}><Icon name={action.icon} size={13} /></span
+          >
+        {/if}
       </button>
     {/if}
   {/each}
 </div>
 
 <style>
+  .act {
+    display: none;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 18px;
+    margin-left: 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-2);
+  }
+  .row:hover .act,
+  .row.sel .act {
+    display: grid;
+  }
+  .act:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
   .list {
     outline: none;
     padding: 2px 0;

@@ -4,8 +4,9 @@ import { createBackend, errorMessage, type Backend } from './api'
 import { describe, newSince } from './activity'
 import { buildNotices } from './notify'
 import type { TraySummary } from './tray'
-import type { ActivityEntry, AppInfo, Commit, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
+import type { ActivityEntry, AppInfo, Commit, GitOp, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
 import type { MenuEntry } from './components/ContextMenu.svelte'
+import type { DialogSpec, DialogValues } from './dialog'
 
 export type View = 'status' | 'history' | 'activity' | 'outgoing' | 'files' | 'fileHistory'
 
@@ -41,6 +42,9 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyWhenFocused: false,
   closeToTray: true,
   startWithWindows: false,
+  readOnly: false,
+  pullMode: 'merge',
+  commitPush: false,
 }
 
 /** 파일 이력 화면을 여는 요청 */
@@ -80,8 +84,17 @@ export class Repo {
   fileHistory = $state<FileHistoryTarget | null>(null)
   /** 마지막으로 변화를 감지한 시각(ms): 탭의 깜빡이는 점 */
   pulse = $state(0)
+  /** 진행 중인 조작 이름 (커밋, push …) */
+  busy = $state<string | null>(null)
+  /** 인덱스(스테이지)가 바뀔 때마다 올라가는 번호: 파일 상태의 diff를 다시 읽는 기준 */
+  indexSeq = $state(0)
+  /** 커밋 메시지 초안 */
+  draft = $state('')
+  amend = $state(false)
   private logSeq = 0
   private loadedOnce = false
+  /** 내가 한 조작이 활동에 남긴 기록은 새 활동으로 알리지 않는다 (이 시각까지) */
+  private quietUntil = 0
 
   constructor(root: string, name: string, scope: 'all' | 'current') {
     this.root = root
@@ -177,7 +190,7 @@ export class Repo {
       const fresh = newSince(list, this.lastSeen)
       this.activity = list
       if (list.length) this.lastSeen = list[0]
-      if (!notify || !fresh.length) return
+      if (!notify || !fresh.length || this.busy || Date.now() < this.quietUntil) return
       if (!(app.active === this && this.view === 'activity')) this.unseen += fresh.length
       void app.notifyActivity(this, fresh)
       for (const e of fresh.slice(0, 3).reverse()) {
@@ -211,11 +224,56 @@ export class Repo {
     this.pulse = Date.now()
     const tasks: Promise<unknown>[] = [this.refreshStatus()]
     if (c.git) {
+      this.indexSeq++
       tasks.push(this.refreshActivity(true))
       if (this.loadedOnce) tasks.push(this.refreshRefs(), this.loadLog(true))
       // 요약 화면에서 읽은 뒤쪽 탭의 push 대기도 계속 맞춘다
       if (this.loadedOnce || this.outgoing) tasks.push(this.refreshOutgoing())
     }
+    await Promise.all(tasks)
+  }
+
+  /**
+   * 조작 실행: 진행 표시, 끝나면 화면을 다시 읽고, 실패하면 git이 남긴 글을 보여 준다.
+   * 성공하면 git 출력, 실패하면 null. `done`은 성공 알림 글 (null이면 알리지 않음)
+   */
+  async run(op: GitOp, label: string, done: string | null | ((out: string) => string | null) = null): Promise<string | null> {
+    if (this.busy) {
+      app.toast(`${this.name}: ${this.busy} 중입니다. 끝난 뒤 다시 해 보세요`, 'warn')
+      return null
+    }
+    this.busy = label
+    try {
+      const out = await app.backend.op(this.root, op)
+      const msg = typeof done === 'function' ? done(out) : done
+      if (msg) app.toast(`${this.name}: ${msg}`, 'success', out.trim() ? { label: 'git 출력', run: () => app.showOutput(label, out) } : undefined)
+      return out
+    } catch (e) {
+      const text = errorMessage(e)
+      // 알림에는 가장 중요한 한 줄 (오류·충돌 줄, 없으면 첫 줄)
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+      const first = lines.find((l) => /^(fatal|error|CONFLICT|!\s*\[rejected\])/i.test(l)) ?? lines[0] ?? text
+      app.toast(`${this.name}: ${label} 실패 — ${first.length > 120 ? `${first.slice(0, 120)}…` : first}`, 'error', {
+        label: '자세히',
+        run: () => app.showOutput(`${label} 실패`, text),
+      })
+      return null
+    } finally {
+      this.busy = null
+      this.quietUntil = Date.now() + 2500
+      await this.afterOp()
+    }
+  }
+
+  /** 조작 뒤 화면을 바로 맞춘다 (감시 알림을 기다리지 않고) */
+  private async afterOp() {
+    this.indexSeq++
+    const tasks: Promise<unknown>[] = [this.refreshStatus(), this.refreshRefs(), this.refreshActivity(false)]
+    if (this.loadedOnce) tasks.push(this.loadLog(true))
+    if (this.loadedOnce || this.outgoing) tasks.push(this.refreshOutgoing())
     await Promise.all(tasks)
   }
 
@@ -252,12 +310,21 @@ class App {
   quickOpen = $state(false)
   settingsOpen = $state(false)
   menu = $state<{ x: number; y: number; items: MenuEntry[] } | null>(null)
+  /** 열려 있는 조작 대화상자 */
+  dialog = $state<{ spec: DialogSpec; resolve: (v: DialogValues | null) => void } | null>(null)
+  /** 커밋 입력란으로 가라는 신호 (툴바의 커밋 버튼) */
+  commitFocus = $state(0)
   private toastId = 0
   private fetchTimer: ReturnType<typeof setInterval> | null = null
   private trayTimer: ReturnType<typeof setTimeout> | undefined
 
   get active(): Repo | null {
     return this.tabs.find((t) => t.root === this.activeRoot) ?? null
+  }
+
+  /** 저장소를 바꾸는 조작을 보여 줄지 (감시 전용 모드가 아니면) */
+  get canWrite(): boolean {
+    return !this.settings.readOnly
   }
 
   /** 요약 화면을 보고 있음 */
@@ -280,6 +347,9 @@ class App {
     }
     const saved = this.settings.active
     this.activeRoot = this.tabs.some((t) => t.root === saved) || (saved === OVERVIEW && this.tabs.length) ? saved : (this.tabs[0]?.root ?? null)
+    // 브라우저 미리보기: ?view=status로 처음 화면을 고른다 (문서 스크린샷용)
+    const firstView = this.backend.isMock ? new URLSearchParams(location.search).get('view') : null
+    if (firstView && this.active) this.active.view = firstView as View
     await this.backend.onChanged((c) => {
       const repo = this.tabs.find((t) => t.root.toLowerCase() === c.root.toLowerCase())
       if (repo) void repo.onChange(c)
@@ -437,6 +507,31 @@ class App {
     } catch (e) {
       this.toast(errorMessage(e), 'error')
     }
+  }
+
+  /** 대화상자를 열고 확인하면 입력값, 취소하면 null */
+  ask(spec: DialogSpec): Promise<DialogValues | null> {
+    this.dialog?.resolve(null)
+    return new Promise((resolve) => {
+      this.dialog = {
+        spec,
+        resolve: (v) => {
+          this.dialog = null
+          resolve(v)
+        },
+      }
+    })
+  }
+
+  async confirm(title: string, text: string, opts: { ok?: string; danger?: boolean; items?: string[] } = {}): Promise<boolean> {
+    const fields: DialogSpec['fields'] = [{ kind: 'info', text }]
+    if (opts.items?.length) fields.push({ kind: 'list', items: opts.items })
+    return (await this.ask({ title, fields, ok: opts.ok, danger: opts.danger })) !== null
+  }
+
+  /** git이 남긴 글 보기 */
+  showOutput(title: string, text: string) {
+    void this.ask({ title, icon: 'terminal', fields: [{ kind: 'output', text: text.trim() || '(출력 없음)' }], ok: '닫기', cancel: null })
   }
 
   toast(text: string, kind: Toast['kind'] = 'info', action?: Toast['action']) {

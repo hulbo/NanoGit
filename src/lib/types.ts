@@ -231,7 +231,45 @@ export interface Settings {
   closeToTray: boolean
   /** Windows 시작 시 트레이로 실행 */
   startWithWindows: boolean
+  /** 감시 전용: 저장소를 바꾸는 조작 버튼을 숨기고 막는다 */
+  readOnly: boolean
+  pullMode: PullMode
+  /** 커밋한 뒤 바로 push */
+  commitPush: boolean
 }
+
+export type HunkAction = 'stage' | 'unstage' | 'discard'
+export type PullMode = 'merge' | 'rebase' | 'ff-only'
+
+/** 저장소를 바꾸는 조작 (src-tauri/src/git/ops.rs의 Op) */
+export type GitOp =
+  | { kind: 'stage'; paths: string[] }
+  | { kind: 'unstage'; paths: string[] }
+  /** staged면 스테이지된 변경까지 HEAD로, 아니면 작업 트리만 */
+  | { kind: 'discard'; paths: string[]; staged: boolean }
+  | { kind: 'hunk'; path: string; header: string; action: HunkAction }
+  | { kind: 'commit'; message: string; amend: boolean }
+  | { kind: 'push'; branch: string | null; remote: string | null; force: boolean }
+  | { kind: 'pull'; mode: PullMode }
+  | { kind: 'branchCreate'; name: string; start: string | null; checkout: boolean }
+  | { kind: 'switch'; branch: string }
+  | { kind: 'switchRemote'; remoteBranch: string }
+  | { kind: 'detach'; rev: string }
+  | { kind: 'branchDelete'; name: string; force: boolean }
+  | { kind: 'branchRename'; old: string; new: string }
+  | { kind: 'merge'; rev: string; noFf: boolean }
+  | { kind: 'stashPush'; message: string | null; untracked: boolean }
+  | { kind: 'stashApply'; index: number; pop: boolean }
+  | { kind: 'stashDrop'; index: number }
+  | { kind: 'tagCreate'; name: string; rev: string | null; message: string | null }
+  | { kind: 'tagDelete'; name: string }
+  | { kind: 'pushTag'; remote: string; name: string }
+  | { kind: 'cherryPick'; rev: string }
+  | { kind: 'revert'; rev: string }
+  | { kind: 'abort' }
+  | { kind: 'continue' }
+  | { kind: 'restoreFile'; path: string; rev: string }
+  | { kind: 'ignore'; pattern: string }
 
 /** 트레이 메뉴에서 고른 동작 */
 export type TrayAction = { kind: 'openRepo'; root: string } | { kind: 'toggleNotify' } | { kind: 'fetchAll' }

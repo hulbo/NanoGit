@@ -72,6 +72,21 @@
         <small>트레이 아이콘: 클릭하면 창을 열고, 우클릭 메뉴에서 저장소별 상태·알림 켜고 끄기·fetch·종료. 새 활동이 있으면 빨간 점</small>
       </div>
     </div>
+    <div class="row">
+      <span>직접 조작</span>
+      <div class="checks">
+        <label class="chk"><input type="checkbox" bind:checked={s.readOnly} onchange={save} />감시 전용 모드 (커밋·push 같은 조작 버튼을 숨기고 막음)</label>
+        <small>AI에게만 git을 맡기고 NanoGit은 지켜보기만 하려면 켜세요</small>
+      </div>
+    </div>
+    <label>
+      <span>Pull 방식</span>
+      <select bind:value={s.pullMode} onchange={save} disabled={s.readOnly}>
+        <option value="merge">병합 (git pull --no-rebase)</option>
+        <option value="rebase">rebase (git pull --rebase)</option>
+        <option value="ff-only">fast-forward만</option>
+      </select>
+    </label>
     <label>
       <span>주기적 fetch</span>
       <select bind:value={s.fetchMinutes} onchange={save}>

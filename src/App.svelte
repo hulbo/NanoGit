@@ -5,6 +5,7 @@
   import FilesView from './lib/components/FilesView.svelte'
   import HistoryView from './lib/components/HistoryView.svelte'
   import Icon from './lib/components/Icon.svelte'
+  import OpDialog from './lib/components/OpDialog.svelte'
   import OutgoingView from './lib/components/OutgoingView.svelte'
   import OverviewView from './lib/components/OverviewView.svelte'
   import QuickOpen from './lib/components/QuickOpen.svelte'
@@ -170,6 +171,11 @@
 {/if}
 {#if app.settingsOpen}
   <SettingsDialog />
+{/if}
+{#if app.dialog}
+  {#key app.dialog}
+    <OpDialog spec={app.dialog.spec} resolve={app.dialog.resolve} />
+  {/key}
 {/if}
 <Toasts />
 

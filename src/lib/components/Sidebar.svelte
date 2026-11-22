@@ -1,7 +1,8 @@
 <script lang="ts">
   // 왼쪽 사이드바 (소스트리 구성): 작업 공간, 브랜치, 태그, 원격, Stash
+  import * as act from '../actions'
   import { relative, short } from '../format'
-  import { commitMenu } from '../menus'
+  import { branchMenu as branchOps, commitMenu, remoteBranchMenu, stashMenu, tagMenu } from '../menus'
   import { app, type Repo, type View } from '../state.svelte'
   import Icon, { type IconName } from './Icon.svelte'
 
@@ -37,12 +38,17 @@
     ['files', '파일 탐색', 'files'],
   ]
 
-  function branchMenu(e: MouseEvent, name: string, sha: string, subject: string) {
-    app.openMenu(e, [
-      { label: '이 브랜치만 히스토리 보기', icon: 'history', action: () => showOnly(name) },
-      ...commitMenu(repo, sha, subject),
-      { label: '브랜치 이름 복사', action: () => app.copy(name, '이름') },
-    ])
+  type MenuEntries = ReturnType<typeof commitMenu>
+
+  /** 브랜치·태그 우클릭: 조작(ops)이 있으면 커밋 조작은 빼고 보기·복사만 덧붙인다 */
+  function branchMenu(e: MouseEvent, name: string, sha: string, subject: string, ops: MenuEntries = []) {
+    const view: MenuEntries = ops.length
+      ? [
+          { label: '히스토리에서 보기', icon: 'history', action: () => repo.reveal(sha) },
+          { label: '커밋 해시 복사', icon: 'copy', action: () => app.copy(sha, '해시') },
+        ]
+      : commitMenu(repo, sha, subject)
+    app.openMenu(e, [...ops, { label: '이것만 히스토리 보기', icon: 'history', action: () => showOnly(name) }, ...view, { label: '이름 복사', action: () => app.copy(name, '이름') }])
   }
 
   async function showOnly(rev: string) {
@@ -88,7 +94,8 @@
         class:current={b.current}
         title="{b.name}{b.upstream ? ` → ${b.upstream}` : ' (추적 브랜치 없음)'}{b.gone ? ' · 원격에서 지워짐' : ''}\n{b.subject}\n{relative(b.time * 1000)}"
         onclick={() => repo.reveal(b.sha)}
-        oncontextmenu={(e) => branchMenu(e, b.name, b.sha, b.subject)}
+        ondblclick={() => app.canWrite && !b.current && act.switchBranch(repo, b.name)}
+        oncontextmenu={(e) => branchMenu(e, b.name, b.sha, b.subject, branchOps(repo, b))}
       >
         <span class="bullet">{b.current ? '●' : ''}</span>
         <span class="label">{b.name}</span>
@@ -105,7 +112,7 @@
   </button>
   {#if open.tags && refs}
     {#each refs.tags.slice(0, 200) as t (t.name)}
-      <button class="item ref-item" onclick={() => repo.reveal(t.sha)} oncontextmenu={(e) => branchMenu(e, t.name, t.sha, t.name)}>
+      <button class="item ref-item" onclick={() => repo.reveal(t.sha)} oncontextmenu={(e) => branchMenu(e, t.name, t.sha, t.name, tagMenu(repo, t.name))}>
         <Icon name="tag" size={13} /><span class="label">{t.name}</span>
       </button>
     {/each}
@@ -124,7 +131,13 @@
       </button>
       {#if remoteOpen[r.name]}
         {#each r.branches as rb (rb.name)}
-          <button class="item ref-item deep" onclick={() => repo.reveal(rb.sha)} oncontextmenu={(e) => branchMenu(e, rb.name, rb.sha, rb.name)} title="{rb.name} · {relative(rb.time * 1000)}">
+          <button
+            class="item ref-item deep"
+            onclick={() => repo.reveal(rb.sha)}
+            ondblclick={() => app.canWrite && act.switchRemote(repo, rb.name)}
+            oncontextmenu={(e) => branchMenu(e, rb.name, rb.sha, rb.name, remoteBranchMenu(repo, rb.name))}
+            title="{rb.name} · {relative(rb.time * 1000)}"
+          >
             <span class="label">{rb.name.slice(r.name.length + 1)}</span>
             <span class="time">{relative(rb.time * 1000)}</span>
           </button>
@@ -138,7 +151,12 @@
   </button>
   {#if open.stashes && refs}
     {#each refs.stashes as s (s.index)}
-      <button class="item ref-item" title="{s.message}\n{relative(s.time * 1000)}" onclick={() => repo.reveal(s.sha)} oncontextmenu={(e) => app.openMenu(e, commitMenu(repo, s.sha, s.message))}>
+      <button class="item ref-item" title="{s.message}\n{relative(s.time * 1000)}" onclick={() => repo.reveal(s.sha)} oncontextmenu={(e) =>
+          app.openMenu(e, [
+            ...stashMenu(repo, s.index, s.message),
+            { label: '히스토리에서 보기', icon: 'history', action: () => repo.reveal(s.sha) },
+            { label: '메시지 복사', icon: 'copy', action: () => app.copy(s.message, '메시지') },
+          ])}>
         <Icon name="stash" size={13} /><span class="label">{s.message}</span><span class="time mono">{short(s.sha)}</span>
       </button>
     {:else}

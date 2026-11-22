@@ -10,14 +10,18 @@ The repository is public (github.com/hulbo/NanoGit): tests, samples and docs use
 - Talk to the user in Korean. UI text, docs and commit messages are Korean too.
 - Personal project: when a change is built, tested and checked, commit and push to `origin main`
   without asking. Ask first only for destructive git operations.
-- Monitoring comes first. Direct git operations (stage, commit, push, pull, branch, stash) are
-  milestone M3 in `docs/PLANNING.md`; until then the backend runs only read-only git commands plus
-  `fetch`. Keep queries on `GIT_OPTIONAL_LOCKS=0` so they never take `index.lock` from an agent.
+- Monitoring comes first. Queries (`git/query.rs`, `git/reflog.rs`) never change the repository and
+  run with `GIT_OPTIONAL_LOCKS=0` so they never take `index.lock` from an agent.
+- Direct operations (M3) live only in `git/ops.rs` behind the single `git_op` command: only what the
+  user picked and confirmed in the UI, refused in read-only mode, one at a time per repository. Files
+  are sent to the Recycle Bin before being discarded or overwritten; force push is `--force-with-lease`
+  only. Flows (dialogs, confirmations) are in `src/lib/actions.ts`.
 - User-supplied revisions go through `git::check_rev` (no leading `-`); paths always follow `--`.
 
 ## Layout
 - `src-tauri/src/git/`: `mod.rs` runs git (no window, timeouts, CP949 fallback), `parse.rs` pure
-  parsers, `query.rs` queries, `reflog.rs` the activity timeline, `model.rs` the IPC data.
+  parsers, `query.rs` queries, `reflog.rs` the activity timeline, `ops.rs` direct operations,
+  `model.rs` the IPC data.
 - `src-tauri/src/watch.rs`: notify watcher, batches changes per repo into `repo://changed`.
 - `src/lib/state.svelte.ts`: tabs (`Repo`) and what to refresh on a change; `src/lib/mock.ts` is the
   browser-preview backend (keep it in step with `api.ts`).

@@ -1,9 +1,21 @@
+<script lang="ts" module>
+  import type { IconName } from './Icon.svelte'
+
+  export interface HunkAction {
+    label: string
+    icon?: IconName
+    danger?: boolean
+    run: (header: string) => void
+  }
+</script>
+
 <script lang="ts">
   // diff 보기 (통합 / 나란히). 화면에 보이는 줄만 그린다.
   import type { Snippet } from 'svelte'
   import { diffStats, parseDiff, splitRows, unifiedRows } from '../diff'
   import { app } from '../state.svelte'
   import type { TextBlob } from '../types'
+  import Icon from './Icon.svelte'
 
   let {
     blob,
@@ -13,6 +25,7 @@
     emptyText = '파일을 고르면 변경 내용이 보입니다',
     fileHeaders = false,
     actions,
+    hunkActions = [],
   }: {
     blob: TextBlob | null
     loading?: boolean
@@ -21,7 +34,11 @@
     emptyText?: string
     fileHeaders?: boolean
     actions?: Snippet
+    /** 헝크마다 붙는 버튼 (스테이지·언스테이지·버리기). 공백 무시 중에는 숨긴다 */
+    hunkActions?: HunkAction[]
   } = $props()
+
+  const hacts = $derived(app.settings.ignoreWhitespace ? [] : hunkActions)
 
   const ROW = 19
   const files = $derived(blob && !blob.binary ? parseDiff(blob.text) : [])
@@ -56,6 +73,12 @@
     void app.persist()
   }
 </script>
+
+{#snippet hunkButtons(header: string)}
+  {#each hacts as a (a.label)}
+    <button class="hbtn" class:danger={a.danger} onclick={() => a.run(header)}>{#if a.icon}<Icon name={a.icon} size={11} />{/if}{a.label}</button>
+  {/each}
+{/snippet}
 
 {#snippet marked(text: string, mark: [number, number] | undefined)}
   {#if mark}{text.slice(0, mark[0])}<mark>{text.slice(mark[0], mark[1])}</mark>{text.slice(mark[1])}{:else}{text}{/if}
@@ -100,7 +123,7 @@
               {#if r.kind === 'file'}
                 <div class="row file">{r.text}</div>
               {:else if r.kind === 'hunk'}
-                <div class="row hunk"><span class="no"></span><span class="no"></span><span class="tx">{r.text}</span></div>
+                <div class="row hunk"><span class="no"></span><span class="no"></span><span class="tx">{r.text}</span>{@render hunkButtons(r.text)}</div>
               {:else}
                 <div class="row {r.kind}">
                   <span class="no">{r.old ?? ''}</span><span class="no">{r.new ?? ''}</span><span class="sign">{r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ''}</span><span class="tx">{@render marked(r.text, r.mark)}</span>
@@ -110,7 +133,7 @@
           {:else}
             {#each sRows.slice(start, end) as r, i (start + i)}
               {#if r.hunk}
-                <div class="row hunk"><span class="tx">{r.hunk}</span></div>
+                <div class="row hunk"><span class="tx">{r.hunk}</span>{@render hunkButtons(r.hunk)}</div>
               {:else}
                 <div class="row pair">
                   <div class="half {r.left?.kind ?? 'none'}"><span class="no">{r.left?.no ?? ''}</span><span class="tx">{#if r.left}{@render marked(r.left.text, r.left.mark)}{/if}</span></div>
@@ -213,6 +236,30 @@
   }
   .hunk .tx {
     padding-left: 8px;
+  }
+  .hbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 16px;
+    margin: 1px 4px 0 0;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 14px;
+    cursor: pointer;
+  }
+  .hbtn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .hbtn.danger:hover {
+    border-color: var(--err);
+    color: var(--err);
   }
   .file {
     padding-left: 8px;

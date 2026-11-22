@@ -167,7 +167,7 @@ impl Git {
         Ok(parse_log(&self.run(&refs, SLOW)?))
     }
 
-    fn has_head(&self) -> bool {
+    pub(crate) fn has_head(&self) -> bool {
         self.run(&["rev-parse", "--verify", "--quiet", "HEAD"], QUICK).is_ok_and(|s| !s.trim().is_empty())
     }
 

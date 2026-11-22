@@ -33,7 +33,7 @@ pub fn run() {
             let hub = WatchHub::new(Arc::new(move |change| {
                 let _ = handle.emit(commands::EVENT_CHANGED, change);
             }));
-            app.manage(Arc::new(AppCore { store, settings: Mutex::new(settings), hub }));
+            app.manage(Arc::new(AppCore { store, settings: Mutex::new(settings), hub, busy: Arc::default() }));
             tray::setup(app.handle())?;
             // Windows 시작 시 자동 실행(--tray)이면 창을 띄우지 않고 트레이에서 감시만 한다
             if !std::env::args().any(|a| a == "--tray") {
@@ -60,6 +60,7 @@ pub fn run() {
             commands::line_history,
             commands::files_list,
             commands::fetch,
+            commands::git_op,
             commands::watch_set,
             commands::open_path,
             commands::reveal_path,

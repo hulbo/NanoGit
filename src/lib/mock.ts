@@ -8,6 +8,7 @@ import type {
   Commit,
   CommitDetail,
   FileChange,
+  GitOp,
   HistoryEntry,
   OutgoingBranch,
   Refs,
@@ -195,6 +196,9 @@ let settings: Settings = {
   notifyWhenFocused: false,
   closeToTray: true,
   startWithWindows: false,
+  readOnly: false,
+  pullMode: 'merge',
+  commitPush: false,
 }
 
 const t0 = Date.now()
@@ -222,23 +226,72 @@ const status = (root: string): Status =>
       }
     : sampleStatus(root)
 
+/** 미리보기에서 조작(스테이지·커밋·push)으로 바뀌는 sample-app의 작업 트리 */
+const work = {
+  staged: [{ path: 'src/lib/api.ts', oldPath: null, status: 'M' }] as { path: string; oldPath: string | null; status: string }[],
+  unstaged: [
+    { path: 'src/lib/auth/login.ts', oldPath: null, status: 'M' },
+    { path: 'src/lib/components/LoginForm.svelte', oldPath: null, status: 'M' },
+    { path: 'docs/메모.md', oldPath: null, status: '?' },
+  ] as { path: string; oldPath: string | null; status: string }[],
+  /** 미리보기에서 만든 커밋 수 (push 대기에 더해진다) */
+  commits: 0,
+  pushed: false,
+}
+
 const sampleStatus = (root: string): Status => ({
   root,
   branch: 'main',
   head: main[99],
   upstream: 'origin/main',
-  ahead: 2,
+  ahead: work.pushed ? 0 : 2 + work.commits,
   behind: root.includes('api') ? 1 : 0,
   state: null,
-  staged: [{ path: 'src/lib/api.ts', oldPath: null, status: 'M', mtime: workMtimes['src/lib/api.ts'] }],
-  unstaged: [
-    { path: 'src/lib/auth/login.ts', oldPath: null, status: 'M', mtime: workMtimes['src/lib/auth/login.ts'] },
-    { path: 'src/lib/components/LoginForm.svelte', oldPath: null, status: 'M', mtime: workMtimes['src/lib/components/LoginForm.svelte'] },
-    { path: 'docs/메모.md', oldPath: null, status: '?', mtime: workMtimes['docs/메모.md'] },
-  ],
+  staged: work.staged.map((f) => ({ ...f, mtime: workMtimes[f.path] ?? null })),
+  unstaged: work.unstaged.map((f) => ({ ...f, mtime: workMtimes[f.path] ?? null })),
   conflicted: [],
   truncated: false,
 })
+
+/** 미리보기용 조작: 스테이지·커밋·push는 화면에 반영하고, 나머지는 흉내만 낸다 */
+function mockOp(op: GitOp): string {
+  const take = (list: typeof work.staged, paths: string[]) => {
+    const moved = list.filter((f) => paths.includes(f.path))
+    for (const f of moved) list.splice(list.indexOf(f), 1)
+    return moved
+  }
+  switch (op.kind) {
+    case 'stage':
+      work.staged.push(...take(work.unstaged, op.paths).map((f) => ({ ...f, status: f.status === '?' ? 'A' : f.status })))
+      return ''
+    case 'unstage':
+      work.unstaged.push(...take(work.staged, op.paths).map((f) => ({ ...f, status: f.status === 'A' ? '?' : f.status })))
+      return ''
+    case 'discard':
+      take(work.unstaged, op.paths)
+      if (op.staged) take(work.staged, op.paths)
+      return ''
+    case 'commit':
+      if (!work.staged.length && !op.amend) throw new Error('nothing to commit, working tree clean')
+      work.staged = []
+      if (!op.amend) work.commits++
+      work.pushed = false
+      return `[main ${hex(2000 + work.commits).slice(0, 7)}] ${op.message.split(/\r?\n/)[0]}\n 1 file changed, 3 insertions(+), 1 deletion(-)`
+    case 'push':
+      work.pushed = true
+      return `To https://github.com/example/sample-app.git\n   ${main[97].slice(0, 7)}..${main[99].slice(0, 7)}  main -> main`
+    case 'pull':
+      return 'Already up to date.'
+    case 'merge':
+      if (op.rev.includes('feature/login'))
+        throw new Error(
+          'Auto-merging src/lib/auth/login.ts\nCONFLICT (content): Merge conflict in src/lib/auth/login.ts\nAutomatic merge failed; fix conflicts and then commit the result.',
+        )
+      return `Merge made by the 'ort' strategy.`
+    default:
+      return `(미리보기) ${op.kind}: 실제 저장소는 바뀌지 않습니다`
+  }
+}
 
 const refs = (): Refs => ({
   branches: [
@@ -264,7 +317,7 @@ const refs = (): Refs => ({
 })
 
 const outgoing = (all: boolean): OutgoingBranch[] => {
-  const ahead = [main[99], main[98]].map((s) => toCommit(byShaMap.get(s)!))
+  const ahead = work.pushed ? [] : [main[99], main[98]].map((s) => toCommit(byShaMap.get(s)!))
   const files = [...filesOf(byShaMap.get(main[98])!), ...filesOf(byShaMap.get(main[99])!)].filter((f, i, a) => a.findIndex((x) => x.path === f.path) === i)
   const list: OutgoingBranch[] = [
     { branch: 'main', current: true, remote: 'origin', target: 'origin/main', newBranch: false, base: main[97], commits: ahead, files, behind: 0, truncated: false },
@@ -440,6 +493,14 @@ export function createMockBackend(): Backend {
       ]),
     files: () => delay([...FILES, 'docs/메모.md'].sort()),
     fetch: () => delay('', 700),
+    async op(root, op) {
+      await delay(null, op.kind === 'push' || op.kind === 'pull' ? 900 : 200)
+      const out = mockOp(op)
+      setTimeout(() => {
+        for (const l of listeners) l({ root, worktree: true, git: true })
+      }, 50)
+      return out
+    },
     watch: () => delay([]),
     async onChanged(cb) {
       listeners.push(cb)

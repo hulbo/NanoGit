@@ -1,16 +1,18 @@
 //! PC에 설치된 git 명령을 창 없이 실행하고 결과를 읽는다.
 //!
-//! 1차(모니터링)에서는 fetch를 빼면 저장소를 바꾸는 명령을 실행하지 않는다.
-//! 조회는 `GIT_OPTIONAL_LOCKS=0`으로 실행해 AI가 실행 중인 git 명령과 `index.lock`으로 부딪히지 않게 한다.
+//! 조회(`query`, `reflog`)는 저장소를 바꾸지 않고, `GIT_OPTIONAL_LOCKS=0`으로 실행해
+//! AI가 실행 중인 git 명령과 `index.lock`으로 부딪히지 않게 한다.
+//! 저장소를 바꾸는 조작은 `ops`에만 있고, 사용자가 화면에서 고른 것만 실행한다.
 
 pub mod model;
+pub mod ops;
 pub mod parse;
 pub mod query;
 pub mod reflog;
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
@@ -147,24 +149,37 @@ pub struct RunOutput {
     pub truncated: bool,
 }
 
+struct Exec {
+    status: ExitStatus,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    truncated: bool,
+}
+
 pub struct Git {
     exe: PathBuf,
     pub loc: RepoLocation,
+    /// 조작용: 편집기를 띄우지 않는다
+    write: bool,
 }
 
 impl Git {
     pub fn open(path: &Path) -> Result<Self, String> {
         let loc = find_repo(path).ok_or_else(|| format!("git 저장소가 아닙니다: {}", display(path)))?;
-        Ok(Git { exe: find_git()?, loc })
+        Ok(Git { exe: find_git()?, loc, write: false })
+    }
+
+    /// 저장소를 바꾸는 조작용으로 연다 (`ops`)
+    pub fn open_write(path: &Path) -> Result<Self, String> {
+        Ok(Git { write: true, ..Self::open(path)? })
     }
 
     pub fn root(&self) -> &Path {
         &self.loc.root
     }
 
-    /// git을 실행하고 표준 출력을 바이트로 돌려준다.
-    /// `ok_codes`의 종료 코드도 성공으로 본다 (`diff --no-index`는 차이가 있으면 1).
-    pub fn run_raw(&self, args: &[&str], input: Option<&[u8]>, timeout: Duration, ok_codes: &[i32]) -> Result<RunOutput, String> {
+    /// git을 실행하고 끝날 때까지 기다린다. 실행하지 못했거나 제한 시간을 넘으면 Err
+    fn exec(&self, args: &[&str], input: Option<&[u8]>, timeout: Duration) -> Result<Exec, String> {
         let mut cmd = Command::new(&self.exe);
         // 한글 파일 이름을 \353... 같은 이스케이프 없이 받는다
         cmd.args(["-c", "core.quotepath=false", "-c", "color.ui=never", "-c", "log.showSignature=false"])
@@ -179,6 +194,10 @@ impl Git {
             .stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if self.write {
+            // 창 없는 git이 편집기를 기다리며 멈추지 않게 한다
+            cmd.env("GIT_EDITOR", "true").env("GIT_SEQUENCE_EDITOR", "true").env("GIT_MERGE_AUTOEDIT", "no");
+        }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
@@ -232,13 +251,36 @@ impl Git {
         if truncated {
             stdout.truncate(MAX_OUTPUT);
         }
-        let stderr = String::from_utf8_lossy(&err_t.join().unwrap_or_default()).trim().to_string();
+        Ok(Exec { status, stdout, stderr: err_t.join().unwrap_or_default(), truncated })
+    }
+
+    /// git을 실행하고 표준 출력을 바이트로 돌려준다.
+    /// `ok_codes`의 종료 코드도 성공으로 본다 (`diff --no-index`는 차이가 있으면 1).
+    pub fn run_raw(&self, args: &[&str], input: Option<&[u8]>, timeout: Duration, ok_codes: &[i32]) -> Result<RunOutput, String> {
+        let Exec { status, stdout, stderr, truncated } = self.exec(args, input, timeout)?;
+        let stderr = String::from_utf8_lossy(&stderr).trim().to_string();
         let code = status.code();
         if status.success() || truncated || code.is_some_and(|c| ok_codes.contains(&c)) {
             Ok(RunOutput { stdout, stderr, truncated })
         } else {
             let msg = if stderr.is_empty() { String::from_utf8_lossy(&stdout).trim().to_string() } else { stderr };
             Err(if msg.is_empty() { format!("git {} 실패 ({status})", args.join(" ")) } else { msg })
+        }
+    }
+
+    /// 조작을 실행하고 git이 남긴 글(표준 출력 + 오류)을 돌려준다.
+    /// 실패해도 두 출력을 합쳐 돌려준다 (병합 충돌 목록은 표준 출력에, 요약은 오류에 나온다).
+    pub fn run_op(&self, args: &[&str], input: Option<&[u8]>, timeout: Duration) -> Result<String, String> {
+        let e = self.exec(args, input, timeout)?;
+        let out = decode(&e.stdout).0;
+        let err = decode(&e.stderr).0;
+        let text = format!("{}\n{}", out.trim(), err.trim()).trim().to_string();
+        if e.status.success() {
+            Ok(text)
+        } else if text.is_empty() {
+            Err(format!("git {} 실패 ({})", args.join(" "), e.status))
+        } else {
+            Err(text)
         }
     }
 
