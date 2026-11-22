@@ -28,6 +28,11 @@ The repository is public (github.com/hulbo/NanoGit): tests, samples and docs use
 - Docs: `README.md` front page, `docs/PLANNING.md` plan and milestones, `docs/DEVELOPMENT.md` build
   and structure. A user-visible change updates README's feature table when it changes the front page.
 
+## Releases
+- Only when the user asks. `npm run version:set -- X.Y.Z`, write `docs/releases/vX.Y.Z.md` (Korean),
+  commit and push `main`, then push an annotated tag `vX.Y.Z`. CI checks the versions, builds, and
+  publishes the GitHub release with the installer (see `docs/DEVELOPMENT.md`).
+
 ## Checks before committing
 - `npm run check`, `npm test`, `cargo test --manifest-path src-tauri/Cargo.toml`
 - Look at the change in the browser preview (`npm run dev`, mock backend at http://localhost:1421)

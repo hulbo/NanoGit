@@ -79,7 +79,8 @@ src-tauri/src/               백엔드 (Rust, Tauri 2)
   store.rs                   설정 파일
   tray.rs                    트레이 아이콘·메뉴, 창 닫기 → 트레이, Windows 시작 시 실행(HKCU Run, --tray)
   shell.rs                   터미널·편집기 열기
-docs/                        기획서, 개발 가이드, 스크린샷
+docs/                        기획서, 개발 가이드, 스크린샷, 릴리스 노트(releases/)
+scripts/version.mjs          앱 버전 맞추기·확인 (릴리스용)
 ```
 
 ## 원칙
@@ -95,4 +96,24 @@ docs/                        기획서, 개발 가이드, 스크린샷
 
 ## CI
 
-`main`에 push하면 GitHub Actions가 타입 검사·테스트를 돌리고 설치본을 빌드합니다. 결과물은 실행 기록의 `nanogit-windows` 아티팩트로 받을 수 있습니다.
+`main`에 push하면 GitHub Actions가 버전 확인·타입 검사·테스트를 돌리고 설치본을 빌드합니다. 결과물은 실행 기록의 `nanogit-windows` 아티팩트로 받을 수 있습니다.
+
+## 릴리스
+
+태그(`v*`)를 push하면 CI가 같은 빌드를 한 뒤 GitHub 릴리스를 만들고 설치본을 올립니다.
+
+1. 버전 바꾸기: `npm run version:set -- 0.2.0`
+   - package.json, package-lock.json, tauri.conf.json, Cargo.toml, Cargo.lock의 버전 줄만 바꿉니다.
+   - 다섯 곳이 같은지는 `npm run version:check`로 봅니다.
+2. 릴리스 노트: `docs/releases/v0.2.0.md`를 씁니다. 없으면 GitHub가 커밋 목록으로 만듭니다.
+3. 커밋하고 `main`에 push합니다.
+4. 태그 push:
+   ```
+   git tag -a v0.2.0 -m "NanoGit 0.2.0"
+   git push origin v0.2.0
+   ```
+
+참고:
+- 태그와 앱 버전이 다르면 CI가 빌드 전에 멈춥니다.
+- `-`가 들어간 태그(`v0.3.0-beta.1`)는 사전 릴리스로 올라갑니다.
+- 같은 태그의 실행을 다시 돌리면 설치본만 바꿔 올립니다.
