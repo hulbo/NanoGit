@@ -223,8 +223,8 @@ AI(Claude Code 등)가 대신 하는 git 작업을 **한눈에 지켜보는 가�
 
 | 동작 | 키 |
 |---|---|
-| 새로고침 | `F5` |
-| 파일 찾기 (이력 조회로 열기) | `Ctrl+P` |
+| 새로고침 | `F5`, `Ctrl+R` |
+| 파일 찾기 (이력 조회로 열기, `*`·`?` 와일드카드) | `Ctrl+Shift+R` (이클립스 Open Resource), `Ctrl+P` |
 | 파일 상태 / 히스토리 / 활동 / Push 대기 | `Ctrl+1` / `Ctrl+2` / `Ctrl+3` / `Ctrl+4` |
 | 다음·이전 저장소 탭 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | 커밋 검색 | `Ctrl+F` |

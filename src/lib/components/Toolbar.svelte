@@ -8,7 +8,6 @@
   let { repo }: { repo: Repo } = $props()
 
   let fetching = $state(false)
-  let refreshing = $state(false)
   let width = $state(1400)
 
   async function fetch() {
@@ -18,9 +17,7 @@
   }
 
   async function refresh() {
-    refreshing = true
-    await repo.refreshAll()
-    refreshing = false
+    await repo.refreshNow()
   }
 
   function commit() {
@@ -81,13 +78,13 @@
     </button>
   {/each}
   <span class="sep"></span>
-  <button class="tool" title="파일을 찾아 이력 조회 (Ctrl+P)" onclick={() => (app.quickOpen = true)}>
+  <button class="tool" title="파일을 찾아 이력 조회 (Ctrl+Shift+R, Ctrl+P) · *, ?로 like 검색" onclick={() => (app.quickOpen = true)}>
     <span class="ic"><Icon name="search" size={20} /></span><span class="lb">파일 찾기</span>
   </button>
   <span class="grow"></span>
   {#if repo.busy}<span class="busy" title="진행 중인 조작"><span class="ic spin"><Icon name="refresh" size={14} /></span>{repo.busy} 중…</span>{/if}
-  <button class="tool" title="새로고침 (F5)" disabled={refreshing} onclick={refresh}>
-    <span class="ic" class:spin={refreshing}><Icon name="refresh" size={20} /></span><span class="lb">새로고침</span>
+  <button class="tool" title="새로고침 (F5)" disabled={repo.refreshing} onclick={refresh}>
+    <span class="ic" class:spin={repo.refreshing}><Icon name="refresh" size={20} /></span><span class="lb">새로고침</span>
   </button>
   <button class="tool" title="이 저장소에서 터미널 열기" onclick={() => app.run(() => app.backend.openTerminal(repo.root))}>
     <span class="ic"><Icon name="terminal" size={20} /></span><span class="lb">터미널</span>

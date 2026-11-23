@@ -89,7 +89,7 @@
       </div>
       <div class="q">
         <!-- svelte-ignore a11y_autofocus -->
-        <input type="search" placeholder="파일 이름으로 찾기 (글자 순서대로)" bind:value={query} onkeydown={onkey} autofocus />
+        <input type="search" placeholder="파일 이름으로 찾기 (글자 순서대로, *·?로 패턴)" bind:value={query} onkeydown={onkey} autofocus />
       </div>
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="list" bind:this={scroller} bind:clientHeight={height} onscroll={(e) => (scrollTop = (e.currentTarget as HTMLDivElement).scrollTop)} tabindex="0" onkeydown={onkey} role="listbox">

@@ -60,7 +60,7 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/notify.ts              새 활동 → Windows 알림 (종류별 켜기·끄기, 많으면 묶기)
   lib/tray.ts                트레이 툴팁·메뉴에 보일 저장소 요약
   lib/overview.ts            저장소 요약 화면: 마지막 변화, 최근 바뀐 파일, 경고 수, 전체 활동 합치기
-  lib/fuzzy.ts               파일 찾기 퍼지 검색
+  lib/fuzzy.ts               파일 찾기: 퍼지 검색, *·? 와일드카드(like) 검색
   lib/format.ts              시간·경로 표시
   lib/menus.ts               파일·커밋·브랜치·태그·stash 우클릭 메뉴
   lib/actions.ts             직접 조작 흐름 (확인·입력 대화상자 → 조작 → 알림)

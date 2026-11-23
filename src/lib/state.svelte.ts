@@ -70,6 +70,8 @@ export class Repo {
   search = $state('')
   /** 이 작성자(이름)의 커밋만. '' = 모두 */
   author = $state('')
+  /** F5·툴바 새로고침 중 */
+  refreshing = $state(false)
   /** 작성자 고르기 목록 (처음 히스토리를 볼 때 읽는다) */
   authors = $state.raw<Author[] | null>(null)
   /** 히스토리에서 고른 커밋 */
@@ -252,6 +254,21 @@ export class Repo {
   async refreshAll() {
     this.loadedOnce = true
     await Promise.all([this.refreshStatus(), this.refreshRefs(), this.loadLog(true), this.refreshActivity(false), this.refreshOutgoing()])
+  }
+
+  /** 사용자가 고른 새로고침 (F5·툴바): 보이는 diff·작성자 목록까지 다시 읽고, 도는 동안 툴바 아이콘이 돈다 */
+  async refreshNow() {
+    if (this.refreshing) return
+    this.refreshing = true
+    this.indexSeq++
+    this.authorsStale = true
+    const started = Date.now()
+    try {
+      await Promise.all([this.refreshAll(), this.authors ? this.loadAuthors() : null])
+    } finally {
+      // 너무 빨리 끝나도 돈 것이 보이게
+      setTimeout(() => (this.refreshing = false), Math.max(0, 400 - (Date.now() - started)))
+    }
   }
 
   ensureLoaded() {

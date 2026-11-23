@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Ctrl+P: 파일을 찾아 바로 이력 조회
+  // Ctrl+Shift+R(이클립스와 같음)·Ctrl+P: 파일을 찾아 바로 이력 조회. *, ?로 like 검색
   import { errorMessage } from '../api'
   import { basename, dirname } from '../format'
-  import { fuzzyFilter } from '../fuzzy'
+  import { isWildcard, searchFiles } from '../fuzzy'
   import { app, type Repo } from '../state.svelte'
   import Icon from './Icon.svelte'
 
@@ -13,7 +13,8 @@
   let idx = $state(0)
   let input: HTMLInputElement | undefined = $state()
 
-  const shown = $derived(fuzzyFilter(q, all, 60))
+  const found = $derived(searchFiles(q, all, 60))
+  const shown = $derived(found.list)
 
   $effect(() => {
     app.backend
@@ -51,7 +52,7 @@
 <div class="qo" role="dialog" aria-label="파일 찾기">
   <div class="in">
     <Icon name="search" size={15} />
-    <input bind:this={input} bind:value={q} onkeydown={onkey} placeholder="이력을 볼 파일 (Enter: 이력, Shift+Enter: Blame)" />
+    <input bind:this={input} bind:value={q} onkeydown={onkey} placeholder="이력을 볼 파일 이름 (*, ? 사용 가능 · Enter: 이력, Shift+Enter: Blame)" />
   </div>
   <div class="list">
     {#each shown as p, i (p)}
@@ -64,6 +65,13 @@
       <div class="none muted">{all.length ? '맞는 파일이 없습니다' : '파일 목록을 읽는 중…'}</div>
     {/each}
   </div>
+  {#if q.trim() && all.length}
+    <div class="foot muted">
+      <span>{isWildcard(q) ? '와일드카드 검색: * 아무 글자들, ? 한 글자 (/가 있으면 경로에서)' : '글자 순서대로 찾기 · *, ?를 쓰면 이름 패턴으로 찾습니다'}</span>
+      <span class="grow"></span>
+      <span>{found.total.toLocaleString()}개{found.total > shown.length ? ` 중 ${shown.length}개` : ''}</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -134,5 +142,15 @@
   }
   .none {
     padding: 12px;
+  }
+  .foot {
+    display: flex;
+    gap: 8px;
+    padding: 5px 12px;
+    border-top: 1px solid var(--border-strong);
+    font-size: 11.5px;
+  }
+  .foot .grow {
+    flex: 1;
   }
 </style>

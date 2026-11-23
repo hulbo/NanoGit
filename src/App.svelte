@@ -42,12 +42,19 @@
 
   function onkey(e: KeyboardEvent) {
     const r = app.active
-    if (e.key === 'F5') {
+    // F5·Ctrl+R: 새로고침 (웹뷰가 화면 전체를 다시 읽지 않게 막는다)
+    if (e.key === 'F5' || (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === 'KeyR')) {
       e.preventDefault()
-      void r?.refreshAll()
+      void r?.refreshNow()
       return
     }
     if (!e.ctrlKey) return
+    // Ctrl+Shift+R: 파일 찾기 (이클립스 Open Resource와 같은 키)
+    if (e.shiftKey && e.code === 'KeyR') {
+      e.preventDefault()
+      if (r) app.quickOpen = true
+      return
+    }
     if (e.key === 'Tab') {
       e.preventDefault()
       app.moveTab(e.shiftKey ? -1 : 1)
@@ -63,10 +70,10 @@
     if (views[e.key]) {
       e.preventDefault()
       r.setView(views[e.key])
-    } else if (e.key === 'p' || e.key === 'P') {
+    } else if (e.code === 'KeyP') {
       e.preventDefault()
       app.quickOpen = true
-    } else if (e.key === 'w' || e.key === 'W') {
+    } else if (e.code === 'KeyW') {
       e.preventDefault()
       void app.closeTab(r.root)
     }
