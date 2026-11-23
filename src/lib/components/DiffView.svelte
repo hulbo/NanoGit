@@ -13,8 +13,10 @@
   // diff 보기 (통합 / 나란히). 화면에 보이는 줄만 그린다.
   import type { Snippet } from 'svelte'
   import { diffStats, parseDiff, splitRows, unifiedRows } from '../diff'
+  import { highlightDiff } from '../highlight'
   import { app } from '../state.svelte'
   import type { TextBlob } from '../types'
+  import CodeText from './CodeText.svelte'
   import Icon from './Icon.svelte'
 
   let {
@@ -41,7 +43,12 @@
   const hacts = $derived(app.settings.ignoreWhitespace ? [] : hunkActions)
 
   const ROW = 19
-  const files = $derived(blob && !blob.binary ? parseDiff(blob.text) : [])
+  const files = $derived.by(() => {
+    if (!blob || blob.binary) return []
+    const f = parseDiff(blob.text)
+    highlightDiff(f)
+    return f
+  })
   const stats = $derived(diffStats(files))
   const mode = $derived(app.settings.diffMode)
   const uRows = $derived(mode === 'unified' ? unifiedRows(files, fileHeaders || files.length > 1) : [])
@@ -78,10 +85,6 @@
   {#each hacts as a (a.label)}
     <button class="hbtn" class:danger={a.danger} onclick={() => a.run(header)}>{#if a.icon}<Icon name={a.icon} size={11} />{/if}{a.label}</button>
   {/each}
-{/snippet}
-
-{#snippet marked(text: string, mark: [number, number] | undefined)}
-  {#if mark}{text.slice(0, mark[0])}<mark>{text.slice(mark[0], mark[1])}</mark>{text.slice(mark[1])}{:else}{text}{/if}
 {/snippet}
 
 <div class="diff">
@@ -126,7 +129,7 @@
                 <div class="row hunk"><span class="no"></span><span class="no"></span><span class="tx">{r.text}</span>{@render hunkButtons(r.text)}</div>
               {:else}
                 <div class="row {r.kind}">
-                  <span class="no">{r.old ?? ''}</span><span class="no">{r.new ?? ''}</span><span class="sign">{r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ''}</span><span class="tx">{@render marked(r.text, r.mark)}</span>
+                  <span class="no">{r.old ?? ''}</span><span class="no">{r.new ?? ''}</span><span class="sign">{r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ''}</span><span class="tx"><CodeText text={r.text} toks={r.toks} mark={r.mark} /></span>
                 </div>
               {/if}
             {/each}
@@ -136,8 +139,8 @@
                 <div class="row hunk"><span class="tx">{r.hunk}</span>{@render hunkButtons(r.hunk)}</div>
               {:else}
                 <div class="row pair">
-                  <div class="half {r.left?.kind ?? 'none'}"><span class="no">{r.left?.no ?? ''}</span><span class="tx">{#if r.left}{@render marked(r.left.text, r.left.mark)}{/if}</span></div>
-                  <div class="half {r.right?.kind ?? 'none'}"><span class="no">{r.right?.no ?? ''}</span><span class="tx">{#if r.right}{@render marked(r.right.text, r.right.mark)}{/if}</span></div>
+                  <div class="half {r.left?.kind ?? 'none'}"><span class="no">{r.left?.no ?? ''}</span><span class="tx">{#if r.left}<CodeText text={r.left.text} toks={r.left.toks} mark={r.left.mark} />{/if}</span></div>
+                  <div class="half {r.right?.kind ?? 'none'}"><span class="no">{r.right?.no ?? ''}</span><span class="tx">{#if r.right}<CodeText text={r.right.text} toks={r.right.toks} mark={r.right.mark} />{/if}</span></div>
                 </div>
               {/if}
             {/each}
@@ -218,11 +221,11 @@
   .del {
     background: var(--diff-del-bg);
   }
-  .add mark {
+  .add :global(mark) {
     background: var(--diff-add-mark);
     color: inherit;
   }
-  .del mark {
+  .del :global(mark) {
     background: var(--diff-del-mark);
     color: inherit;
   }

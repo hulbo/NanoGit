@@ -12,17 +12,22 @@
 </script>
 
 <script lang="ts">
-  // 파일 내용 보기 (줄 번호, 선택적 blame 칸). 줄 번호를 끌어 범위를 고르면 onrange
+  // 파일 내용 보기 (줄 번호, 구문 강조, 선택적 blame 칸). 줄 번호를 끌어 범위를 고르면 onrange
   import { shortDate, short } from '../format'
+  import { highlightLines, languageOf } from '../highlight'
+  import CodeText from './CodeText.svelte'
 
   let {
     lines,
+    path = null,
     blame = null,
     range = null,
     onrange,
     onblame,
   }: {
     lines: string[]
+    /** 구문 강조할 언어를 고르는 데 쓴다 */
+    path?: string | null
     blame?: BlameCell[] | null
     range?: [number, number] | null
     onrange?: (r: [number, number] | null) => void
@@ -37,6 +42,7 @@
   const start = $derived(Math.max(0, Math.floor(scrollTop / ROW) - 20))
   const end = $derived(Math.min(lines.length, Math.ceil((scrollTop + height) / ROW) + 20))
   const noWidth = $derived(String(lines.length).length * 8 + 18)
+  const toks = $derived(highlightLines(lines, languageOf(path, lines.slice(0, 80).join('\n'))))
 
   function down(e: PointerEvent, n: number) {
     if (!onrange) return
@@ -75,7 +81,7 @@
           {/if}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <span class="no" style="width:{noWidth}px" onpointerdown={(e) => down(e, n)} onpointerenter={() => over(n)}>{n}</span>
-          <span class="tx">{text}</span>
+          <span class="tx"><CodeText {text} toks={toks?.[n - 1]} /></span>
         </div>
       {/each}
     </div>

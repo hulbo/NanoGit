@@ -134,7 +134,7 @@
         {:else if content?.binary}
           <div class="empty">이진 파일입니다</div>
         {:else if content}
-          <CodeView {lines} />
+          <CodeView {lines} path={selected} />
         {/if}
       </div>
     </div>

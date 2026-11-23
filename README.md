@@ -38,6 +38,7 @@ NanoGit은 그 확인을 위한 앱입니다. 화면은 소스트리(SourceTree)
 | **활동 타임라인** | AI가 한 커밋·amend·reset·전환·병합·rebase·push·fetch를 시간순으로. reset·강제 push로 **버려진 커밋**은 빨간 경고와 함께 그 자리에서 내용을 봅니다 |
 | **Push 대기** | IntelliJ push 대화상자처럼 아직 push하지 않은 커밋과 바뀐 파일·diff. 원격이 앞서 있으면(pull 필요) 미리 알려 줍니다 |
 | **파일 이력 (강화)** | 이름 변경까지 따라가는 이력, 두 버전 비교(Ctrl+클릭), 그 버전 내용, blame, 작업 트리와 비교, **선택한 줄만의 이력**(`git log -L`) |
+| **구문 강조** | 파일 내용·blame·diff를 파일 종류에 맞는 색으로: Java·Kotlin·JS/TS·Vue·HTML·XML·yml·properties·JSON·SQL·CSS·Markdown·셸 등. **MyBatis 매퍼 XML은 태그 사이 SQL까지** 강조합니다 |
 | **파일 상태** | 스테이지된·안 된 파일을 **최근 변경순**으로. AI가 방금 고친 파일이 맨 위에 "방금"으로 뜹니다 |
 | **직접 조작** | 파일·헝크 단위 스테이지·언스테이지·버리기, 커밋(amend, 커밋 후 push), Push 대기에서 확인하고 push, pull, 브랜치·병합·stash·태그, cherry-pick·revert, 병합 충돌 계속·중단. 버리는 파일은 **휴지통**에 남아 되살릴 수 있습니다 |
 | **히스토리** | 그래프, 브랜치·태그 배지, 모든 브랜치/현재 브랜치, 메시지 검색, push 안 한 커밋 표시 |

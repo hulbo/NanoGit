@@ -37,6 +37,19 @@
   --diff-hunk-fg: #8fb2f5;
   --diff-gutter: #6a6e75;
 
+  /* 구문 강조 (IntelliJ 계열) */
+  --hl-keyword: #cf8e6d;
+  --hl-string: #6aab73;
+  --hl-number: #2aacb8;
+  --hl-comment: #7a7e85;
+  --hl-doctag: #67a37c;
+  --hl-meta: #b3ae60;
+  --hl-func: #56a8f5;
+  --hl-tag: #d5b778;
+  --hl-attr: #bababa;
+  --hl-field: #c77dbb;
+  --hl-builtin: #8888c6;
+
   --ref-head: #3574f0;
   --ref-local: #3b8a40;
   --ref-remote: #7a5ea8;
@@ -95,6 +108,18 @@
   --diff-hunk-fg: #2a62d4;
   --diff-gutter: #9a9da6;
 
+  --hl-keyword: #0033b3;
+  --hl-string: #067d17;
+  --hl-number: #1750eb;
+  --hl-comment: #8c8c8c;
+  --hl-doctag: #3d7a52;
+  --hl-meta: #9e880d;
+  --hl-func: #00627a;
+  --hl-tag: #0033b3;
+  --hl-attr: #174ad4;
+  --hl-field: #871094;
+  --hl-builtin: #000080;
+
   --lane-0: #2a62d4;
   --lane-1: #208a3c;
   --lane-2: #b7791f;
@@ -136,6 +161,57 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+/* 구문 강조 조각 (src/lib/highlight.ts의 classOf) */
+.hl-k {
+  color: var(--hl-keyword);
+}
+.hl-s {
+  color: var(--hl-string);
+}
+.hl-n {
+  color: var(--hl-number);
+}
+.hl-c {
+  color: var(--hl-comment);
+}
+.hl-d {
+  color: var(--hl-doctag);
+}
+.hl-m {
+  color: var(--hl-meta);
+}
+.hl-f {
+  color: var(--hl-func);
+}
+.hl-t {
+  color: var(--hl-tag);
+}
+.hl-a {
+  color: var(--hl-attr);
+}
+.hl-p {
+  color: var(--hl-field);
+}
+.hl-b {
+  color: var(--hl-builtin);
+}
+.hl-h {
+  color: var(--hl-func);
+  font-weight: 600;
+}
+.hl-em {
+  font-style: italic;
+}
+.hl-strong {
+  font-weight: 600;
+}
+.hl-add {
+  color: var(--ok);
+}
+.hl-del {
+  color: var(--err);
 }
 
 button:focus-visible,

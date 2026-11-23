@@ -2,10 +2,12 @@
   // 파일 이력 (강화): 이름 변경 추적, 커밋별 변경, 두 버전 비교, 그 버전 내용, blame, 작업 트리와 비교, 선택한 줄의 이력
   import { errorMessage } from '../api'
   import { parseDiff, unifiedRows, type UnifiedRow } from '../diff'
+  import { highlightDiff } from '../highlight'
   import { basename, dateTime, initial, nameHue, shortDate, short } from '../format'
   import { commitMenu, fileMenu } from '../menus'
   import { app, type Repo } from '../state.svelte'
   import type { Blame, CommitDetail, DiffTarget, HistoryEntry, LineHistoryEntry, TextBlob } from '../types'
+  import CodeText from './CodeText.svelte'
   import CodeView, { type BlameCell } from './CodeView.svelte'
   import DiffView from './DiffView.svelte'
   import FileList from './FileList.svelte'
@@ -174,6 +176,12 @@
     })
   })
   const blameLines = $derived(blame ? blame.lines.map((l) => l.text) : [])
+  /** 선택한 줄 이력의 diff (구문 강조 포함) */
+  function lineRows(diff: string): UnifiedRow[] {
+    const files = parseDiff(diff)
+    highlightDiff(files)
+    return unifiedRows(files, false).filter((r) => r.kind !== 'hunk')
+  }
   const contentLines = $derived(content && !content.binary ? content.text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n') : [])
 
   async function lineHistory() {
@@ -336,8 +344,8 @@
                           <span class="muted">{l.commit.author} · {shortDate(l.commit.time)}</span>
                         </button>
                         <div class="lh-diff mono">
-                          {#each unifiedRows(parseDiff(l.diff), false).filter((r: UnifiedRow) => r.kind !== 'hunk') as r, i (i)}
-                            <div class="ln {r.kind}"><span class="lno">{r.new ?? r.old ?? ''}</span>{r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ' '}{r.text}</div>
+                          {#each lineRows(l.diff) as r, i (i)}
+                            <div class="ln {r.kind}"><span class="lno">{r.new ?? r.old ?? ''}</span>{r.kind === 'add' ? '+' : r.kind === 'del' ? '-' : ' '}<CodeText text={r.text} toks={r.toks} /></div>
                           {/each}
                         </div>
                       </div>
@@ -362,10 +370,10 @@
                 {#if content.binary}
                   <div class="empty">이진 파일입니다 ({content.size.toLocaleString()} 바이트)</div>
                 {:else}
-                  <CodeView lines={contentLines} {range} onrange={(r) => (range = r)} />
+                  <CodeView lines={contentLines} path={one ? one.path : target.path} {range} onrange={(r) => (range = r)} />
                 {/if}
               {:else if tab === 'blame' && blame}
-                <CodeView lines={blameLines} blame={blameCells} {range} onrange={(r) => (range = r)} onblame={jumpTo} />
+                <CodeView lines={blameLines} path={one ? one.path : target.path} blame={blameCells} {range} onrange={(r) => (range = r)} onblame={jumpTo} />
               {/if}
             </div>
           </div>

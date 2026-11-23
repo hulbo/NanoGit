@@ -56,6 +56,9 @@ const FILES = [
   'package.json',
   'vite.config.ts',
   'tests/session.test.ts',
+  'server/src/main/resources/application.yml',
+  'server/src/main/resources/mapper/OrderMapper.xml',
+  'server/src/main/java/com/example/sample/order/OrderService.java',
 ]
 
 const now = Math.floor(Date.now() / 1000)
@@ -142,6 +145,26 @@ function filesOf(n: Node): FileChange[] {
 function fakeDiff(path: string, seed: number, untracked = false): string {
   if (untracked) return `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,4 @@\n+# 메모\n+\n+- 세션 만료 시간 확인\n+- 로그인 실패 횟수 제한\n`
   const base = 10 + (seed % 30)
+  if (path.endsWith('Mapper.xml'))
+    return [
+      `diff --git a/${path} b/${path}`,
+      `--- a/${path}`,
+      `+++ b/${path}`,
+      `@@ -9,8 +9,6 @@`,
+      `       LEFT JOIN ORDER_ITEM ITM ON ITM.ORDER_ID = ORD.ORDER_ID`,
+      `-     WHERE ORD.USE_YN = 'Y'`,
+      `-    <if test="statusCd != null">`,
+      `-       AND ORD.STATUS_CD = #{statusCd}`,
+      `-    </if>`,
+      `+    -- 테스트용: 조건 없이 전체 조회`,
+      `+     WHERE 1 = 1`,
+      `     <![CDATA[ AND ORD.ORDER_DT < SYSDATE - 30 ]]>`,
+      `      GROUP BY ORD.ORDER_ID, ORD.STATUS_CD, ORD.AMOUNT`,
+      `   </select>`,
+      ``,
+    ].join('\n')
+  if (path.endsWith('.yml'))
+    return [`diff --git a/${path} b/${path}`, `--- a/${path}`, `+++ b/${path}`, `@@ -4,4 +4,4 @@ spring:`, `     username: sample_app`, `     hikari:`, `-      maximum-pool-size: 20`, `+      maximum-pool-size: 40`, `   jpa:`, ``].join('\n')
   return [
     `diff --git a/${path} b/${path}`,
     `index ${hex(seed).slice(0, 7)}..${hex(seed + 1).slice(0, 7)} 100644`,
@@ -169,8 +192,16 @@ function fakeDiff(path: string, seed: number, untracked = false): string {
 
 const blob = (text: string): TextBlob => ({ text, binary: false, truncated: false, encoding: 'utf-8', size: text.length })
 
-const sampleLines = (path: string) =>
-  [`// ${path}`, `import { parse } from './parser'`, `import { log } from './log'`, ``, `export function handle(input) {`, `  const value = input.trim()`, `  if (!value) return null`, `  const result = parse(value, { strict: true })`, `  if (!result.ok) {`, `    log.warn('입력을 해석하지 못했습니다', value)`, `  }`, `  return result.ok ? result : null`, `}`, ``, `export function format(date) {`, `  return date.toLocaleString('ko-KR')`, `}`]
+/** 파일 종류에 맞는 예시 내용 (구문 강조 미리보기용) */
+const sampleLines = (path: string): string[] => {
+  if (path.endsWith('.yml'))
+    return [`# ${path}`, `spring:`, `  datasource:`, `    url: jdbc:postgresql://db.example.com:5432/sample`, `    username: sample_app`, `    hikari:`, `      maximum-pool-size: 40`, `  jpa:`, `    open-in-view: false`, ``, `server:`, `  port: 8080`, `  servlet:`, `    session:`, `      cookie:`, `        secure: true`, `        http-only: true`, ``, `logging:`, `  level:`, `    root: warn`, `    com.example.sample: debug`]
+  if (path.endsWith('Mapper.xml'))
+    return [`<?xml version="1.0" encoding="UTF-8"?>`, `<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">`, `<mapper namespace="com.example.sample.order.OrderMapper">`, ``, `  <!-- 주문 목록: 상태와 기간으로 찾는다 -->`, `  <select id="selectOrders" parameterType="map" resultType="OrderVO">`, `    SELECT ORD.ORDER_ID, ORD.STATUS_CD, ORD.AMOUNT, COUNT(ITM.ITEM_ID) AS ITEM_CNT`, `      FROM ORDERS ORD`, `      LEFT JOIN ORDER_ITEM ITM ON ITM.ORDER_ID = ORD.ORDER_ID`, `     WHERE ORD.USE_YN = 'Y'`, `    <if test="statusCd != null">`, `       AND ORD.STATUS_CD = #{statusCd}`, `    </if>`, `    <![CDATA[ AND ORD.ORDER_DT < SYSDATE - 30 ]]>`, `     GROUP BY ORD.ORDER_ID, ORD.STATUS_CD, ORD.AMOUNT`, `  </select>`, `</mapper>`]
+  if (path.endsWith('.java'))
+    return [`package com.example.sample.order;`, ``, `import org.springframework.stereotype.Service;`, ``, `/**`, ` * 주문 조회`, ` * @author 예시`, ` */`, `@Service`, `public class OrderService {`, `    private final OrderMapper mapper;`, `    private static final int PAGE_SIZE = 20;`, ``, `    public OrderService(OrderMapper mapper) {`, `        this.mapper = mapper;`, `    }`, ``, `    public List<OrderVO> find(String statusCd) {`, `        if (statusCd == null) return List.of(); // 상태가 없으면 빈 목록`, `        return mapper.selectOrders(Map.of("statusCd", statusCd));`, `    }`, `}`]
+  return [`// ${path}`, `import { parse } from './parser'`, `import { log } from './log'`, ``, `export function handle(input) {`, `  const value = input.trim()`, `  if (!value) return null`, `  const result = parse(value, { strict: true })`, `  if (!result.ok) {`, `    log.warn('입력을 해석하지 못했습니다', value)`, `  }`, `  return result.ok ? result : null`, `}`, ``, `export function format(date) {`, `  return date.toLocaleString('ko-KR')`, `}`]
+}
 
 let settings: Settings = {
   repos: [
@@ -232,6 +263,7 @@ const work = {
   unstaged: [
     { path: 'src/lib/auth/login.ts', oldPath: null, status: 'M' },
     { path: 'src/lib/components/LoginForm.svelte', oldPath: null, status: 'M' },
+    { path: 'server/src/main/resources/mapper/OrderMapper.xml', oldPath: null, status: 'M' },
     { path: 'docs/메모.md', oldPath: null, status: '?' },
   ] as { path: string; oldPath: string | null; status: string }[],
   /** 미리보기에서 만든 커밋 수 (push 대기에 더해진다) */

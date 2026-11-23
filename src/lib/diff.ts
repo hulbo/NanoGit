@@ -1,4 +1,5 @@
 // unified diff 해석과 화면용 변환 (통합 보기·나란히 보기·바뀐 부분 강조)
+import type { Tok } from './highlight'
 
 export type LineKind = 'ctx' | 'add' | 'del' | 'hunk' | 'meta' | 'nonl'
 
@@ -7,6 +8,8 @@ export interface DiffLine {
   text: string
   old: number | null
   new: number | null
+  /** 구문 강조 조각 (highlightDiff가 채운다) */
+  toks?: Tok[]
 }
 
 export interface Hunk {
@@ -139,6 +142,7 @@ export interface UnifiedRow {
   new: number | null
   /** 바뀐 부분 강조 [시작, 끝) */
   mark?: [number, number]
+  toks?: Tok[]
   file?: number
   hunk?: number
 }
@@ -175,7 +179,7 @@ export function unifiedRows(files: DiffFile[], withFileHeaders: boolean): Unifie
     f.hunks.forEach((h, hi) => {
       rows.push({ kind: 'hunk', text: h.header, old: null, new: null, file: fi, hunk: hi })
       const marks = pairMarks(h.lines)
-      h.lines.forEach((l, li) => rows.push({ kind: l.kind, text: l.text, old: l.old, new: l.new, mark: marks.get(li) }))
+      h.lines.forEach((l, li) => rows.push({ kind: l.kind, text: l.text, old: l.old, new: l.new, mark: marks.get(li), toks: l.toks }))
     })
   })
   return rows
@@ -186,6 +190,7 @@ export interface SideCell {
   text: string
   no: number | null
   mark?: [number, number]
+  toks?: Tok[]
 }
 
 export interface SplitRow {
@@ -215,8 +220,8 @@ export function splitRows(files: DiffFile[]): SplitRow[] {
             const d = dels[k]
             const a = adds[k]
             rows.push({
-              left: d === undefined ? null : { kind: 'del', text: L[d].text, no: L[d].old, mark: marks.get(d) },
-              right: a === undefined ? null : { kind: 'add', text: L[a].text, no: L[a].new, mark: marks.get(a) },
+              left: d === undefined ? null : { kind: 'del', text: L[d].text, no: L[d].old, mark: marks.get(d), toks: L[d].toks },
+              right: a === undefined ? null : { kind: 'add', text: L[a].text, no: L[a].new, mark: marks.get(a), toks: L[a].toks },
             })
           }
           continue
@@ -225,7 +230,7 @@ export function splitRows(files: DiffFile[]): SplitRow[] {
           i++
           continue
         }
-        rows.push({ left: { kind: 'ctx', text: l.text, no: l.old }, right: { kind: 'ctx', text: l.text, no: l.new } })
+        rows.push({ left: { kind: 'ctx', text: l.text, no: l.old, toks: l.toks }, right: { kind: 'ctx', text: l.text, no: l.new, toks: l.toks } })
         i++
       }
     }

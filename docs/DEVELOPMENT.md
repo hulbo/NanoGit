@@ -55,6 +55,7 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/types.ts               백엔드와 같은 모양의 데이터
   lib/graph.ts               히스토리 그래프 레인 계산
   lib/diff.ts                unified diff 해석, 통합·나란히 보기, 바뀐 부분 강조
+  lib/highlight.ts           구문 강조: 파일 종류 고르기, highlight.js 결과 → 줄마다 색 조각, 매퍼 XML의 SQL
   lib/activity.ts            reflog 항목 → 활동 종류·설명·위험도
   lib/notify.ts              새 활동 → Windows 알림 (종류별 켜기·끄기, 많으면 묶기)
   lib/tray.ts                트레이 툴팁·메뉴에 보일 저장소 요약
@@ -65,7 +66,7 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/actions.ts             직접 조작 흐름 (확인·입력 대화상자 → 조작 → 알림)
   lib/dialog.ts              조작 대화상자(OpDialog)의 입력 칸 모양
   lib/components/            RepoTabs, Toolbar, Sidebar, HistoryView, StatusView, ActivityView,
-                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, OpDialog, ...
+                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, CodeText, OpDialog, ...
 src-tauri/src/               백엔드 (Rust, Tauri 2)
   lib.rs                     앱 시작, 명령 등록
   commands.rs                IPC 명령 (모두 별도 스레드에서 git 실행)
