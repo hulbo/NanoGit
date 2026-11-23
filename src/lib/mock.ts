@@ -368,6 +368,8 @@ const activity = (): ActivityEntry[] => {
     e(55, 'refs/heads/feature/login', Z, login[0], 'branch: Created from main'),
     e(70, 'refs/remotes/origin/main', main[95], main[96], 'fetch: fast-forward'),
     e(120, 'refs/heads/main', main[49], main[50], "merge feature/api: Merge made by the 'ort' strategy."),
+    e(60 * 26, 'refs/remotes/origin/main', main[48], main[49], 'fetch: fast-forward'),
+    e(60 * 24 * 3, 'refs/heads/main', main[47], main[48], `commit: ${byShaMap.get(main[48])!.subject}`),
   ]
 }
 

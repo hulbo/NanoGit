@@ -215,6 +215,7 @@
     flex: none;
     color: var(--muted);
     font-size: 11.5px;
+    white-space: nowrap;
   }
   .time.fresh {
     padding: 0 5px;

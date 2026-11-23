@@ -167,7 +167,8 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 78px 120px 140px 1fr 110px;
+    /* 시각 칸: "12월 31일 23:59"가 한 줄에 들어가는 폭 */
+    grid-template-columns: 100px 120px 140px 1fr 110px;
     align-items: center;
     gap: 8px;
     width: 100%;
@@ -201,8 +202,11 @@
     font-weight: 600;
   }
   .time {
+    overflow: hidden;
     color: var(--muted);
     font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .kind {
     display: flex;
