@@ -167,6 +167,62 @@ impl Git {
         Ok(parse_log(&self.run(&refs, SLOW)?))
     }
 
+    /// 검색어가 커밋 ID(전체·짧은 해시)나 브랜치·태그 이름이면 그 커밋. 아니면 빈 목록.
+    /// 짧은 해시가 여러 커밋과 겹치면 모두 (최대 20개)
+    pub fn find_commits(&self, query: &str) -> Result<Vec<Commit>, String> {
+        let q = query.trim();
+        if q.is_empty() || q.len() > 200 || q.starts_with('-') || q.contains(':') || q.chars().any(|c| c.is_whitespace() || c.is_control()) {
+            return Ok(Vec::new());
+        }
+        let hex = q.len() >= 4 && q.bytes().all(|b| b.is_ascii_hexdigit());
+        let lower = q.to_ascii_lowercase();
+        let mut tries = vec![q];
+        if hex && lower != q {
+            tries.push(&lower);
+        }
+        let mut shas: Vec<String> = Vec::new();
+        for t in &tries {
+            if let Ok(s) = self.run(&["rev-parse", "--verify", "--quiet", &format!("{t}^{{commit}}")], QUICK) {
+                let s = s.trim();
+                if !s.is_empty() {
+                    shas.push(s.to_string());
+                    break;
+                }
+            }
+        }
+        if shas.is_empty() && hex {
+            // 짧은 해시가 여러 개체와 겹친다: 그 중 커밋만
+            let out = self.run(&["rev-parse", &format!("--disambiguate={lower}")], QUICK).unwrap_or_default();
+            for s in out.lines().map(str::trim).filter(|s| !s.is_empty()).take(20) {
+                if self.run(&["cat-file", "-t", s], QUICK).is_ok_and(|t| t.trim() == "commit") {
+                    shas.push(s.to_string());
+                }
+            }
+        }
+        if shas.is_empty() {
+            return Ok(Vec::new());
+        }
+        let format = format!("--format={LOG_FORMAT}");
+        let mut args = vec!["log", "-z", "--no-walk=unsorted", "--decorate=full", &format];
+        args.extend(shas.iter().map(String::as_str));
+        args.push("--");
+        Ok(parse_log(&self.run(&args, QUICK)?))
+    }
+
+    /// 히스토리(모든 브랜치·원격·태그)의 작성자들. 커밋이 많은 순
+    pub fn authors(&self) -> Result<Vec<Author>, String> {
+        if !self.has_head() && self.run(&["for-each-ref", "--count=1", "--format=%(refname)"], QUICK)?.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut args = vec!["log", "--format=%an%x1f%ae"];
+        if self.has_head() {
+            args.push("HEAD");
+        }
+        args.extend(["--branches", "--remotes", "--tags", "--"]);
+        let out = self.run(&args, SLOW)?;
+        Ok(count_authors(&out))
+    }
+
     pub(crate) fn has_head(&self) -> bool {
         self.run(&["rev-parse", "--verify", "--quiet", "HEAD"], QUICK).is_ok_and(|s| !s.trim().is_empty())
     }
@@ -555,6 +611,27 @@ pub(crate) mod tests {
         let found = git.log(&LogQuery { scope: LogScope::Current, skip: 0, limit: 10, message: Some("AUTH".into()), author: None, path: None }).unwrap();
         assert_eq!(found.len(), 1);
         assert!(git.log(&LogQuery { scope: LogScope::Revs { revs: vec!["--output=x".into()] }, skip: 0, limit: 1, message: None, author: None, path: None }).is_err());
+
+        // 작성자로 거르기 (메시지 검색과 함께면 둘 다 맞는 것만), 커밋 ID·태그로 찾기, 작성자 목록
+        let by = |author: &str, message: Option<&str>| {
+            let q = LogQuery { scope: LogScope::All, skip: 0, limit: 10, message: message.map(String::from), author: Some(author.into()), path: None };
+            git.log(&q).unwrap().iter().map(|c| c.subject.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(by("홍길동 <", None).len(), 3);
+        assert!(by("김철수 <", None).is_empty());
+        assert_eq!(by("홍길동 <", Some("auth")), vec!["auth 수정"]);
+        assert!(by("김철수 <", Some("auth")).is_empty());
+        let short = &log[1].sha[..7];
+        assert_eq!(git.find_commits(short).unwrap()[0].sha, log[1].sha);
+        assert_eq!(git.find_commits(&short.to_uppercase()).unwrap()[0].sha, log[1].sha);
+        assert_eq!(git.find_commits("v0.1").unwrap()[0].sha, log[0].sha);
+        assert!(git.find_commits("없는 말").unwrap().is_empty());
+        assert!(git.find_commits("auth").unwrap().is_empty());
+        assert!(git.find_commits("--all").unwrap().is_empty());
+        assert!(git.find_commits("HEAD:auth.ts").unwrap().is_empty());
+        let authors = git.authors().unwrap();
+        assert_eq!(authors.len(), 1);
+        assert_eq!((authors[0].name.as_str(), authors[0].email.as_str(), authors[0].count), ("홍길동", "hong@example.com", 3));
 
         // 커밋 상세: 이름 변경
         let d = git.commit(&log[0].sha).unwrap();

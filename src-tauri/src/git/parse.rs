@@ -1,5 +1,7 @@
 //! git 출력 파서. 모두 순수 함수라 실제 git 없이 시험한다.
 
+use std::collections::HashMap;
+
 use super::model::*;
 
 /// 필드 구분자 (Unit Separator)
@@ -350,9 +352,42 @@ pub fn parse_file_history(out: &str, fallback_path: &str) -> Vec<HistoryEntry> {
         .collect()
 }
 
+/// `git log --format=%an%x1f%ae` 출력 → 작성자별 커밋 수 (이름이 같으면 한 사람, 메일은 가장 많이 쓴 것)
+pub fn count_authors(out: &str) -> Vec<Author> {
+    let mut by_name: HashMap<&str, (u32, HashMap<&str, u32>)> = HashMap::new();
+    for line in out.lines() {
+        let (name, email) = line.split_once(FS).unwrap_or((line, ""));
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let e = by_name.entry(name).or_default();
+        e.0 += 1;
+        *e.1.entry(email.trim()).or_default() += 1;
+    }
+    let mut list: Vec<Author> = by_name
+        .into_iter()
+        .map(|(name, (count, emails))| {
+            let email = emails.into_iter().max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(a.0))).map(|(e, _)| e.to_string()).unwrap_or_default();
+            Author { name: name.to_string(), email, count }
+        })
+        .collect();
+    list.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    list
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authors_by_count() {
+        let out = "김하늘\x1fsky@example.com\n이도윤\x1fdoyun@example.com\n김하늘\x1fsky@example.com\n김하늘\x1fold@example.com\n\x1fnobody@example.com\n";
+        let list = count_authors(out);
+        assert_eq!(list.len(), 2);
+        assert_eq!((list[0].name.as_str(), list[0].email.as_str(), list[0].count), ("김하늘", "sky@example.com", 3));
+        assert_eq!((list[1].name.as_str(), list[1].count), ("이도윤", 1));
+    }
 
     #[test]
     fn decoration() {

@@ -31,6 +31,15 @@ pub struct Commit {
     pub refs: Vec<RefLabel>,
 }
 
+/// 히스토리의 작성자 (작성자로 거르기)
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Author {
+    pub name: String,
+    /// 가장 많이 쓴 메일
+    pub email: String,
+    pub count: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {

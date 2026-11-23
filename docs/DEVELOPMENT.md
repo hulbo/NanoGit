@@ -72,7 +72,8 @@ src-tauri/src/               백엔드 (Rust, Tauri 2)
   commands.rs                IPC 명령 (모두 별도 스레드에서 git 실행)
   git/mod.rs                 git 찾기·실행(창 없이, 제한 시간, GIT_OPTIONAL_LOCKS=0), 저장소 찾기, 인코딩
   git/parse.rs               log·status·raw/numstat·blame·reflog 출력 해석
-  git/query.rs               조회: 상태, 참조, 히스토리, 커밋, diff, push 대기, 파일 이력, blame, 줄 이력
+  git/query.rs               조회: 상태, 참조, 히스토리(메시지·작성자 검색, 커밋 ID 찾기, 작성자 목록), 커밋, diff,
+                             push 대기, 파일 이력, blame, 줄 이력
   git/ops.rs                 직접 조작: 스테이지·헝크·버리기(휴지통), 커밋, push·pull, 브랜치·병합·stash·태그
   git/reflog.rs              활동 타임라인 (reflog 파일 직접 읽기, 버려진 커밋 수)
   git/model.rs               화면으로 보내는 데이터

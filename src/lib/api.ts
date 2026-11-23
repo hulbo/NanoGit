@@ -5,6 +5,7 @@ import type {
   ActivityEntry,
   AppInfo,
   Blame,
+  Author,
   Commit,
   CommitDetail,
   DiffOptions,
@@ -33,6 +34,9 @@ export interface Backend {
   status(root: string): Promise<Status>
   refs(root: string): Promise<Refs>
   log(root: string, query: LogQuery): Promise<Commit[]>
+  /** 검색어가 커밋 ID·브랜치·태그 이름이면 그 커밋 */
+  findCommits(root: string, query: string): Promise<Commit[]>
+  authors(root: string): Promise<Author[]>
   commit(root: string, sha: string): Promise<CommitDetail>
   commitBranches(root: string, sha: string): Promise<string[]>
   diff(root: string, target: DiffTarget, options?: DiffOptions): Promise<TextBlob>
@@ -91,6 +95,8 @@ async function createTauriBackend(): Promise<Backend> {
     status: (root) => call('status_get', { root }),
     refs: (root) => call('refs_get', { root }),
     log: (root, query) => call('log_get', { root, query }),
+    findCommits: (root, query) => call('log_find', { root, query }),
+    authors: (root) => call('log_authors', { root }),
     commit: (root, sha) => call('commit_get', { root, sha }),
     commitBranches: (root, sha) => call('commit_branches', { root, sha }),
     diff: (root, target, options) => call('diff_get', { root, target, options: options ?? null }),

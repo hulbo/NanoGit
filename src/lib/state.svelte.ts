@@ -4,7 +4,7 @@ import { createBackend, errorMessage, type Backend } from './api'
 import { describe, newSince } from './activity'
 import { buildNotices } from './notify'
 import type { TraySummary } from './tray'
-import type { ActivityEntry, AppInfo, Commit, GitOp, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
+import type { ActivityEntry, AppInfo, Author, Commit, GitOp, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
 import type { MenuEntry } from './components/ContextMenu.svelte'
 import type { DialogSpec, DialogValues } from './dialog'
 
@@ -68,6 +68,10 @@ export class Repo {
   logLoading = $state(false)
   scope = $state<'all' | 'current'>('all')
   search = $state('')
+  /** 이 작성자(이름)의 커밋만. '' = 모두 */
+  author = $state('')
+  /** 작성자 고르기 목록 (처음 히스토리를 볼 때 읽는다) */
+  authors = $state.raw<Author[] | null>(null)
   /** 히스토리에서 고른 커밋 */
   selected = $state<string | null>(null)
 
@@ -92,6 +96,12 @@ export class Repo {
   draft = $state('')
   amend = $state(false)
   private logSeq = 0
+  /** 지금까지 읽은 git log 결과 수 (다음 쪽의 skip. ID로 찾은 커밋은 세지 않는다) */
+  private logSkip = 0
+  /** 마지막으로 읽은 검색어 */
+  private foundFor = ''
+  private authorsStale = false
+  private authorsLoading = false
   private loadedOnce = false
   /** 내가 한 조작이 활동에 남긴 기록은 새 활동으로 알리지 않는다 (이 시각까지) */
   private quietUntil = 0
@@ -143,27 +153,56 @@ export class Repo {
   async loadLog(reset = true) {
     const seq = ++this.logSeq
     this.logLoading = true
-    const skip = reset ? 0 : this.commits.length
-    const limit = reset ? Math.max(PAGE, Math.min(this.commits.length, 5000)) : PAGE
+    const skip = reset ? 0 : this.logSkip
+    const limit = reset ? Math.max(PAGE, Math.min(this.logSkip, 5000)) : PAGE
+    const search = this.search.trim()
+    const author = this.author
     try {
-      const list = await app.backend.log(this.root, {
-        scope: { kind: this.scope },
-        skip,
-        limit,
-        message: this.search.trim() || null,
-      })
+      const [list, hits] = await Promise.all([
+        app.backend.log(this.root, {
+          scope: { kind: this.scope },
+          skip,
+          limit,
+          message: search || null,
+          // git은 "이름 <메일>"에서 찾으므로 " <"까지 붙여 이름이 같은 사람만
+          author: author ? `${author} <` : null,
+        }),
+        // 검색어가 커밋 ID·브랜치·태그면 그 커밋도 맨 위에
+        reset && search ? app.backend.findCommits(this.root, search).catch(() => [] as Commit[]) : Promise.resolve([] as Commit[]),
+      ])
       if (seq !== this.logSeq) return
-      this.commits = reset ? list : [...this.commits, ...list]
+      const found = hits.filter((c) => !author || c.author === author)
+      const base = reset ? found : this.commits
+      const seen = new Set(base.map((c) => c.sha))
+      this.commits = [...base, ...list.filter((c) => !seen.has(c.sha))]
+      this.logSkip = skip + list.length
       this.logDone = list.length < limit
-      if (reset && this.selected && !list.some((c) => c.sha === this.selected)) {
-        // 고른 커밋이 사라졌으면(amend·reset) 맨 위를 고른다
-        this.selected = list[0]?.sha ?? null
+      // 새로 검색해서 ID로 찾았으면 그 커밋을 고른다 (같은 검색으로 다시 읽을 때는 고른 것을 둔다)
+      if (reset && found.length && search !== this.foundFor) this.selected = found[0].sha
+      if (reset) this.foundFor = search
+      if (reset && this.selected && !this.commits.some((c) => c.sha === this.selected)) {
+        // 고른 커밋이 사라졌으면(amend·reset, 검색) 맨 위를 고른다
+        this.selected = this.commits[0]?.sha ?? null
       }
-      if (!this.selected && list.length) this.selected = list[0].sha
+      if (!this.selected && this.commits.length) this.selected = this.commits[0].sha
     } catch (e) {
       if (seq === this.logSeq) app.toast(`${this.name}: ${errorMessage(e)}`, 'error')
     } finally {
       if (seq === this.logSeq) this.logLoading = false
+    }
+  }
+
+  /** 작성자 목록 (처음이거나 커밋이 바뀐 뒤에만 다시 읽는다) */
+  async loadAuthors(force = false) {
+    if (this.authorsLoading || (this.authors && !this.authorsStale && !force)) return
+    this.authorsLoading = true
+    try {
+      this.authors = await app.backend.authors(this.root)
+      this.authorsStale = false
+    } catch (e) {
+      app.toast(`${this.name}: ${errorMessage(e)}`, 'error')
+    } finally {
+      this.authorsLoading = false
     }
   }
 
@@ -225,6 +264,7 @@ export class Repo {
     const tasks: Promise<unknown>[] = [this.refreshStatus()]
     if (c.git) {
       this.indexSeq++
+      this.authorsStale = true
       tasks.push(this.refreshActivity(true))
       if (this.loadedOnce) tasks.push(this.refreshRefs(), this.loadLog(true))
       // 요약 화면에서 읽은 뒤쪽 탭의 push 대기도 계속 맞춘다

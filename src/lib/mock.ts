@@ -490,7 +490,20 @@ export function createMockBackend(): Backend {
         list = nodes.filter((n) => reach.has(n.sha))
       }
       if (q.message) list = list.filter((n) => n.subject.toLowerCase().includes(q.message!.toLowerCase()))
+      if (q.author) list = list.filter((n) => `${AUTHORS[n.author][0]} <${AUTHORS[n.author][1]}>`.toLowerCase().includes(q.author!.toLowerCase()))
       return delay(list.slice(q.skip, q.skip + q.limit).map(toCommit), 120)
+    },
+    async findCommits(_root, query) {
+      const q = query.trim().toLowerCase()
+      const r = refs()
+      const named = [...r.branches.map((b) => [b.name, b.sha]), ...r.tags.map((t) => [t.name, t.sha])].find(([name]) => name.toLowerCase() === q)?.[1]
+      const hits = named ? nodes.filter((n) => n.sha === named) : /^[0-9a-f]{4,40}$/.test(q) ? nodes.filter((n) => n.sha.startsWith(q)) : []
+      return delay(hits.slice(0, 20).map(toCommit))
+    },
+    async authors() {
+      const counts = new Map<number, number>()
+      for (const n of nodes) counts.set(n.author, (counts.get(n.author) ?? 0) + 1)
+      return delay([...counts].sort((a, b) => b[1] - a[1]).map(([i, count]) => ({ name: AUTHORS[i][0], email: AUTHORS[i][1], count })))
     },
     async commit(_root, sha): Promise<CommitDetail> {
       const n = byShaMap.get(sha) ?? { sha, parents: [main[96]], author: 1, time: now - 900, subject: '임시: 디버그 로그 추가', i: 7 }

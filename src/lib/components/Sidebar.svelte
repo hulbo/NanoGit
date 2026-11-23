@@ -55,6 +55,7 @@
     repo.setView('history')
     repo.selected = null
     repo.search = ''
+    repo.author = ''
     try {
       repo.commits = await app.backend.log(repo.root, { scope: { kind: 'revs', revs: [rev] }, skip: 0, limit: 1000 })
       repo.logDone = true

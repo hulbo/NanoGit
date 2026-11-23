@@ -142,6 +142,17 @@ pub async fn log_get(root: String, query: LogQuery) -> Result<Vec<Commit>, Strin
     blocking(move || open(&root)?.log(&query)).await
 }
 
+/// 검색어가 커밋 ID·브랜치·태그 이름이면 그 커밋
+#[tauri::command]
+pub async fn log_find(root: String, query: String) -> Result<Vec<Commit>, String> {
+    blocking(move || open(&root)?.find_commits(&query)).await
+}
+
+#[tauri::command]
+pub async fn log_authors(root: String) -> Result<Vec<Author>, String> {
+    blocking(move || open(&root)?.authors()).await
+}
+
 #[tauri::command]
 pub async fn commit_get(root: String, sha: String) -> Result<CommitDetail, String> {
     blocking(move || open(&root)?.commit(&sha)).await

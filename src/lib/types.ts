@@ -18,6 +18,14 @@ export interface Commit {
   refs: RefLabel[]
 }
 
+/** 히스토리의 작성자 (작성자로 거르기) */
+export interface Author {
+  name: string
+  /** 가장 많이 쓴 메일 */
+  email: string
+  count: number
+}
+
 export interface FileChange {
   /** A, M, D, R, C, T, U */
   status: string

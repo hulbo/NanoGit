@@ -49,6 +49,8 @@ pub fn run() {
             commands::status_get,
             commands::refs_get,
             commands::log_get,
+            commands::log_find,
+            commands::log_authors,
             commands::commit_get,
             commands::commit_branches,
             commands::diff_get,

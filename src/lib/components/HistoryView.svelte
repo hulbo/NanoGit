@@ -1,5 +1,6 @@
 <script lang="ts">
-  // 히스토리: 그래프 + 커밋 목록(가상 스크롤) + 아래 커밋 상세
+  // 히스토리: 그래프 + 커밋 목록(가상 스크롤) + 아래 커밋 상세. 메시지·커밋 ID 검색, 작성자로 거르기
+  import { untrack } from 'svelte'
   import { computeGraph } from '../graph'
   import { shortDate, short } from '../format'
   import { commitMenu } from '../menus'
@@ -19,7 +20,8 @@
   const unpushed = $derived(repo.unpushed)
   const changes = $derived(repo.changeCount)
   /** 맨 위 "커밋하지 않은 변경" 행 */
-  const pseudo = $derived(changes > 0 && !repo.search ? 1 : 0)
+  const filtering = $derived(!!repo.search.trim() || !!repo.author)
+  const pseudo = $derived(changes > 0 && !filtering ? 1 : 0)
   const total = $derived(repo.commits.length + pseudo)
 
   let scroller: HTMLDivElement | undefined = $state()
@@ -53,6 +55,22 @@
       repo.search = searchText
       void repo.loadLog(true)
     }, 300)
+  }
+
+  // 다른 곳에서 검색을 지우면(브랜치만 보기 등) 입력란도 비운다
+  $effect(() => {
+    if (!repo.search) searchText = ''
+  })
+
+  // 작성자 목록은 처음 볼 때 한 번 읽는다 (커밋이 바뀌면 고를 때 다시)
+  $effect(() => {
+    const r = repo
+    untrack(() => void r.loadAuthors())
+  })
+
+  function setAuthor(name: string) {
+    repo.author = name
+    void repo.loadLog(true)
   }
 
   function select(i: number) {
@@ -96,10 +114,24 @@
           <button class:on={repo.scope === 'current'} onclick={() => setScope('current')}>현재 브랜치</button>
         </div>
         <span class="grow"></span>
-        {#if repo.logLoading}<span class="muted small">불러오는 중…</span>{/if}
+        {#if repo.logLoading}<span class="muted small">불러오는 중…</span>{:else if filtering}<span class="muted small">커밋 {repo.commits.length}{repo.logDone ? '' : '+'}개</span>{/if}
+        <select
+          class="who"
+          class:on={!!repo.author}
+          value={repo.author}
+          title="작성자로 거르기"
+          onfocus={() => repo.loadAuthors()}
+          onchange={(e) => setAuthor((e.currentTarget as HTMLSelectElement).value)}
+        >
+          <option value="">작성자: 모두</option>
+          {#if repo.author && !repo.authors?.some((a) => a.name === repo.author)}<option value={repo.author}>{repo.author}</option>{/if}
+          {#each repo.authors ?? [] as a (a.name)}
+            <option value={a.name} title={a.email}>{a.name} ({a.count.toLocaleString()})</option>
+          {/each}
+        </select>
         <div class="search">
           <Icon name="search" size={13} />
-          <input type="search" placeholder="커밋 메시지 검색" bind:value={searchText} oninput={onsearch} />
+          <input type="search" placeholder="메시지·커밋 ID·태그 검색" title="커밋 메시지(본문 포함)와 커밋 ID(짧은 해시), 브랜치·태그 이름으로 찾습니다" bind:value={searchText} oninput={onsearch} />
         </div>
       </div>
       <div class="cols" style="--gw:{graphWidth}px">
@@ -126,7 +158,10 @@
                   onclick={() => (repo.selected = c.sha)}
                   oncontextmenu={(e) => {
                     repo.selected = c.sha
-                    app.openMenu(e, commitMenu(repo, c.sha, c.subject))
+                    const who = repo.author
+                      ? { label: '작성자 거르기 풀기', action: () => setAuthor('') }
+                      : { label: `${c.author}의 커밋만 보기`, action: () => setAuthor(c.author) }
+                    app.openMenu(e, [...commitMenu(repo, c.sha, c.subject), 'separator', who])
                   }}
                 >
                   <span class="g"><GraphCell row={graph[i - pseudo]} height={ROW} lane={LANE} unpushed={up} /></span>
@@ -143,7 +178,7 @@
           </div>
         </div>
         {#if !repo.commits.length && !repo.logLoading}
-          <div class="empty">{repo.search ? '찾는 커밋이 없습니다' : '커밋이 없습니다'}</div>
+          <div class="empty">{filtering ? '찾는 커밋이 없습니다' : '커밋이 없습니다'}</div>
         {/if}
       </div>
     </div>
@@ -170,6 +205,13 @@
   }
   .search input {
     width: 220px;
+  }
+  .who {
+    max-width: 180px;
+  }
+  .who.on {
+    border-color: var(--accent);
+    color: var(--accent-text);
   }
   .cols,
   .row {
