@@ -2,7 +2,7 @@
 
 import * as act from './actions'
 import type { MenuEntry } from './components/ContextMenu.svelte'
-import { joinPath, short } from './format'
+import { basename, joinPath, short } from './format'
 import { app, type Repo } from './state.svelte'
 import type { WorkFile } from './types'
 
@@ -54,6 +54,7 @@ export function fileMenu(repo: Repo, f: FileRef): MenuEntry[] {
     'separator',
     { label: '경로 복사', icon: 'copy', action: () => app.copy(abs, '경로') },
     { label: '상대 경로 복사', action: () => app.copy(f.path, '경로') },
+    { label: '파일 이름 복사', action: () => app.copy(basename(f.path), '파일 이름') },
   )
   return items
 }
