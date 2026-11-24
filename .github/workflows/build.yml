@@ -1,7 +1,8 @@
 name: build
 
 # main push·PR: 검사·테스트·설치본 빌드
-# 태그 v* push: 같은 빌드를 한 뒤 버전을 확인하고 GitHub 릴리스를 만들어 설치본을 올린다
+# 태그 v* push: 같은 빌드를 한 뒤 버전을 확인하고 GitHub 릴리스를 만들어 설치본을 올린다.
+# 앱 안 업데이트: secrets.TAURI_SIGNING_PRIVATE_KEY로 설치본에 서명(.sig)하고, 릴리스에 latest.json을 함께 올린다
 on:
   push:
     branches: [main]
@@ -50,8 +51,22 @@ jobs:
       - name: 백엔드 테스트
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: 설치본 빌드
-        run: npm run tauri build
+      - name: 설치본 빌드 (서명 키가 있으면 업데이트 서명까지)
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npm run tauri build
+          elif [ "$IS_TAG" = "true" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY secret이 없어 앱 안 업데이트용 서명을 만들 수 없습니다 (docs/DEVELOPMENT.md 릴리스)"
+            exit 1
+          else
+            echo "::warning::서명 키가 없어 업데이트 서명 없이 빌드합니다"
+            npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
 
       - name: 설치본 업로드
         uses: actions/upload-artifact@v7
@@ -66,13 +81,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          files=(src-tauri/target/release/bundle/nsis/*.exe)
+          exe=(src-tauri/target/release/bundle/nsis/*-setup.exe)
+          # 앱 안 업데이트가 읽는 latest.json (서명 포함). 주소는 이 태그의 릴리스 파일
+          node scripts/latest-json.mjs "$TAG" "${exe[0]}" "https://github.com/$REPO/releases/download/$TAG" "docs/releases/$TAG.md" > latest.json
+          files=("${exe[0]}" "${exe[0]}.sig" latest.json)
           if [ -f "docs/releases/$TAG.md" ]; then notes=(--notes-file "docs/releases/$TAG.md"); else notes=(--generate-notes); fi
           prerelease=()
           if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
           if gh release view "$TAG" > /dev/null 2>&1; then
-            # 다시 실행한 경우: 설치본만 바꿔 올린다
+            # 다시 실행한 경우: 설치본·서명·latest.json만 바꿔 올린다
             gh release upload "$TAG" "${files[@]}" --clobber
           else
             gh release create "$TAG" "${files[@]}" --title "NanoGit ${TAG#v}" --verify-tag "${notes[@]}" "${prerelease[@]}"

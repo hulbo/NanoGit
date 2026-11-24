@@ -49,6 +49,7 @@ NanoGit은 그 확인을 위한 앱입니다. 화면은 소스트리(SourceTree)
 1. [Releases](https://github.com/hulbo/NanoGit/releases/latest)에서 `NanoGit_<버전>_x64-setup.exe`를 받아 실행합니다 (관리자 권한 없이 사용자 폴더에 설치됩니다).
 2. PC에 [Git for Windows](https://git-scm.com/download/win)(2.30 이상)가 있어야 합니다. NanoGit은 설치된 git을 그대로 씁니다.
 3. 코드 서명을 하지 않은 설치 파일이라 Windows SmartScreen이 경고할 수 있습니다. "추가 정보 → 실행"을 누르세요.
+4. 그다음부터는 **앱 안에서 업데이트**합니다. 새 버전이 나오면 알림과 상태 표시줄의 "새 버전" 버튼이 뜨고, 누르면 받아서 설치한 뒤 다시 켜집니다 (v0.1.4부터. 설정에서 "업데이트 확인"으로 바로 볼 수도 있습니다).
 
 ## 빠르게 시작하기
 

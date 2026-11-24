@@ -32,6 +32,9 @@ The repository is public (github.com/hulbo/NanoGit): tests, samples and docs use
 - Only when the user asks. `npm run version:set -- X.Y.Z`, write `docs/releases/vX.Y.Z.md` (Korean),
   commit and push `main`, then push an annotated tag `vX.Y.Z`. CI checks the versions, builds, and
   publishes the GitHub release with the installer (see `docs/DEVELOPMENT.md`).
+- In-app updates: CI signs the installer with the `TAURI_SIGNING_PRIVATE_KEY` secret and uploads
+  `latest.json` (`scripts/latest-json.mjs`); the app checks `releases/latest`. The private key lives
+  outside the repo (`%USERPROFILE%\.tauri\nanogit.key`); never commit it or print it.
 
 ## Checks before committing
 - `npm run check`, `npm test`, `cargo test --manifest-path src-tauri/Cargo.toml`

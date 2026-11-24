@@ -83,6 +83,7 @@ src-tauri/src/               백엔드 (Rust, Tauri 2)
   shell.rs                   터미널·편집기 열기
 docs/                        기획서, 개발 가이드, 스크린샷, 릴리스 노트(releases/)
 scripts/version.mjs          앱 버전 맞추기·확인 (릴리스용)
+scripts/latest-json.mjs      앱 안 업데이트가 읽는 latest.json 만들기 (CI가 릴리스에 올림)
 ```
 
 ## 원칙
@@ -103,6 +104,7 @@ scripts/version.mjs          앱 버전 맞추기·확인 (릴리스용)
 ## 릴리스
 
 태그(`v*`)를 push하면 CI가 같은 빌드를 한 뒤 GitHub 릴리스를 만들고 설치본을 올립니다.
+설치본에는 업데이트 서명(`.sig`)을 붙이고 `latest.json`도 함께 올려, 설치된 NanoGit이 앱 안에서 새 버전을 받습니다.
 
 1. 버전 바꾸기: `npm run version:set -- 0.2.0`
    - package.json, package-lock.json, tauri.conf.json, Cargo.toml, Cargo.lock의 버전 줄만 바꿉니다.
@@ -118,4 +120,16 @@ scripts/version.mjs          앱 버전 맞추기·확인 (릴리스용)
 참고:
 - 태그와 앱 버전이 다르면 CI가 빌드 전에 멈춥니다.
 - `-`가 들어간 태그(`v0.3.0-beta.1`)는 사전 릴리스로 올라갑니다.
-- 같은 태그의 실행을 다시 돌리면 설치본만 바꿔 올립니다.
+- 같은 태그의 실행을 다시 돌리면 설치본·서명·latest.json만 바꿔 올립니다.
+
+### 앱 안 업데이트 (tauri-plugin-updater)
+
+- 앱은 켠 뒤 15초, 그다음 6시간마다(설정에서 끌 수 있음) `releases/latest/download/latest.json`을 봅니다.
+  새 버전이 있으면 알림과 상태 표시줄의 "새 버전" 버튼이 뜨고, 누르면 받아서 NSIS 설치본을 passive로 실행합니다.
+  앱은 바로 끝나고, 설치가 끝나면 다시 켜져 "업데이트했습니다"를 알립니다(`src-tauri/src/update.rs`, 설정 폴더의 `updated-from.txt`).
+- 서명: 설치본은 개인 키로 서명하고, 앱은 `tauri.conf.json`의 `plugins.updater.pubkey`로 확인합니다.
+  - 개인 키: 이 PC의 `%USERPROFILE%\.tauri\nanogit.key` (저장소에 넣지 않음. 잃어버리면 이미 설치된 앱은 새 키로 서명한 업데이트를 받지 못하므로 한 번 더 손으로 설치해야 합니다).
+  - CI: 저장소 Actions secret `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용), `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(비밀번호, 지금은 빈 값).
+  - secret이 없으면 main·PR 빌드는 서명 없이 만들고, 태그 빌드는 멈춥니다.
+- 시험: `productName`·`identifier`·`version`과 `endpoints`(로컬 http, `dangerousInsecureTransportProtocol`)를 바꾼 `--config`로 두 버전을 빌드하면
+  설치된 NanoGit과 설정(`%APPDATA%\<앱 이름>`)을 건드리지 않고 끝까지 시험할 수 있습니다.

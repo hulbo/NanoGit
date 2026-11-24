@@ -4,7 +4,7 @@ import { createBackend, errorMessage, type Backend } from './api'
 import { describe, newSince } from './activity'
 import { buildNotices } from './notify'
 import type { TraySummary } from './tray'
-import type { ActivityEntry, AppInfo, Author, Commit, GitOp, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
+import type { ActivityEntry, AppInfo, Author, Commit, GitOp, UpdateInfo, OutgoingBranch, Refs, RepoChange, Settings, Status } from './types'
 import type { MenuEntry } from './components/ContextMenu.svelte'
 import type { DialogSpec, DialogValues } from './dialog'
 
@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   readOnly: false,
   pullMode: 'merge',
   commitPush: false,
+  autoUpdate: true,
 }
 
 /** 파일 이력 화면을 여는 요청 */
@@ -365,6 +366,10 @@ class App {
   activeRoot = $state<string | null>(null)
   toasts = $state<Toast[]>([])
   quickOpen = $state(false)
+  /** 새 버전 (없으면 null) */
+  update = $state<UpdateInfo | null>(null)
+  /** 새 버전을 받는 중: 0~1, 전체 크기를 모르면 -1. 받지 않을 때 null */
+  updateProgress = $state<number | null>(null)
   settingsOpen = $state(false)
   menu = $state<{ x: number; y: number; items: MenuEntry[] } | null>(null)
   /** 열려 있는 조작 대화상자 */
@@ -373,6 +378,7 @@ class App {
   commitFocus = $state(0)
   private toastId = 0
   private fetchTimer: ReturnType<typeof setInterval> | null = null
+  private updateTimer: ReturnType<typeof setTimeout> | null = null
   private trayTimer: ReturnType<typeof setTimeout> | undefined
 
   get active(): Repo | null {
@@ -398,6 +404,7 @@ class App {
       this.toast(errorMessage(e), 'error')
     }
     if (this.info?.gitError) this.toast(this.info.gitError, 'error')
+    if (this.info?.updatedFrom) this.toast(`NanoGit ${this.info.version}로 업데이트했습니다 (전 버전 ${this.info.updatedFrom})`, 'success')
     for (const root of this.settings.tabs) {
       const entry = this.settings.repos.find((r) => r.path === root)
       this.tabs.push(new Repo(root, entry?.name ?? root.split('/').pop() ?? root, this.settings.historyScope))
@@ -434,6 +441,7 @@ class App {
     this.applyTheme()
     window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => this.applyTheme())
     this.setupFetchTimer()
+    this.setupUpdateTimer()
     this.ready = true
   }
 
@@ -448,6 +456,57 @@ class App {
     this.fetchTimer = null
     const min = this.settings.fetchMinutes
     if (min > 0) this.fetchTimer = setInterval(() => void this.fetchAll(true), min * 60000)
+  }
+
+  /** 새 버전 자동 확인: 켠 뒤 잠시 있다가, 그다음 6시간마다 (트레이에 오래 떠 있으므로) */
+  setupUpdateTimer() {
+    if (this.updateTimer) clearTimeout(this.updateTimer)
+    this.updateTimer = null
+    if (!this.settings.autoUpdate) return
+    const next = (ms: number) => {
+      this.updateTimer = setTimeout(async () => {
+        await this.checkUpdate(false)
+        next(6 * 3600_000)
+      }, ms)
+    }
+    next(15_000)
+  }
+
+  /** 새 버전 확인. manual이면 결과(최신·실패)도 알린다 */
+  async checkUpdate(manual: boolean) {
+    try {
+      const u = await this.backend.updateCheck()
+      const fresh = !!u && u.version !== this.update?.version
+      this.update = u
+      if (u && (manual || fresh)) {
+        this.toast(`새 버전이 있습니다: NanoGit ${u.version} (지금 ${u.current})`, 'info', { label: '업데이트', run: () => void this.installUpdate() })
+      } else if (!u && manual) {
+        this.toast(`최신 버전입니다 (NanoGit ${this.info?.version ?? ''})`, 'success')
+      }
+    } catch (e) {
+      if (manual) this.toast(errorMessage(e), 'error')
+    }
+  }
+
+  /** 새 버전을 받아 설치한다. 확인을 받고, 받는 동안 상태 표시줄에 진행률을 보인다 */
+  async installUpdate() {
+    const u = this.update
+    if (!u || this.updateProgress !== null) return
+    const notes = (u.notes ?? '').replace(/\*\*|`/g, '').replace(/^#+\s*/gm, '').trim()
+    const fields: DialogSpec['fields'] = [
+      { kind: 'info', text: `NanoGit ${u.current} → ${u.version}. 받아서 설치하면 NanoGit이 잠시 닫혔다가 다시 켜지고, 감시도 이어서 합니다.` },
+    ]
+    if (notes) fields.push({ kind: 'output', text: notes })
+    const ok = await this.ask({ title: `NanoGit ${u.version}로 업데이트`, icon: 'pull', fields, ok: '업데이트' })
+    if (!ok) return
+    this.updateProgress = 0
+    try {
+      await this.backend.updateInstall((got, total) => (this.updateProgress = total ? Math.min(1, got / total) : -1))
+    } catch (e) {
+      this.toast(errorMessage(e), 'error')
+    } finally {
+      this.updateProgress = null
+    }
   }
 
   async fetchAll(quiet: boolean) {

@@ -230,6 +230,7 @@ let settings: Settings = {
   readOnly: false,
   pullMode: 'merge',
   commitPush: false,
+  autoUpdate: true,
 }
 
 const t0 = Date.now()
@@ -468,6 +469,21 @@ export function createMockBackend(): Backend {
 
   return {
     isMock: true,
+    // ?update=1로 열면 새 버전이 있는 것처럼 (문서 스크린샷·미리보기용)
+    updateCheck: () =>
+      delay(
+        typeof location !== 'undefined' && new URLSearchParams(location.search).has('update')
+          ? { version: '9.9.9', current: '0.1.0', notes: '## 새 기능\n\n- **예시 기능**: 미리보기용 릴리스 노트입니다.', date: '2026-11-24' }
+          : null,
+        300,
+      ),
+    async updateInstall(onProgress) {
+      for (let i = 0; i <= 10; i++) {
+        onProgress(i * 250_000, 2_500_000)
+        await delay(null, 120)
+      }
+      throw new Error('미리보기에서는 설치하지 않습니다')
+    },
     appInfo: () => delay({ version: '0.1.0', gitPath: 'C:/Program Files/Git/cmd/git.exe', gitVersion: 'git version 2.50.1 (미리보기)', gitError: null, dataDir: '(브라우저 미리보기)' }),
     settingsGet: () => delay(structuredClone(settings)),
     async settingsSave(s) {

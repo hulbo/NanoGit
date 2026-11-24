@@ -53,6 +53,8 @@ pub struct Settings {
     pub pull_mode: String,
     /// 커밋한 뒤 바로 push
     pub commit_push: bool,
+    /// 켤 때와 몇 시간마다 새 버전을 확인한다
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -80,6 +82,7 @@ impl Default for Settings {
             read_only: false,
             pull_mode: "merge".into(),
             commit_push: false,
+            auto_update: true,
         }
     }
 }
@@ -89,11 +92,13 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn default_dir() -> PathBuf {
+    /// 설정 폴더: NANOGIT_HOME, 아니면 %APPDATA%\<앱 이름> (앱 이름은 NanoGit. 시험용 빌드는 이름을 바꿔 따로 쓴다)
+    pub fn default_dir(app_name: &str) -> PathBuf {
         if let Some(home) = std::env::var_os("NANOGIT_HOME").filter(|h| !h.is_empty()) {
             return PathBuf::from(home);
         }
-        dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("NanoGit")
+        let name = if app_name.trim().is_empty() { "NanoGit" } else { app_name.trim() };
+        dirs::config_dir().unwrap_or_else(std::env::temp_dir).join(name)
     }
 
     /// 설정 폴더를 따로 쓰는 실행인지 (개발·시험용. 단일 인스턴스 검사를 건너뛴다)
@@ -159,6 +164,8 @@ mod tests {
         // 알림 설정이 없던 파일도 기본값(켜짐)으로 읽는다
         assert!(s.notify_enabled && s.notify_warn && !s.notify_branch);
         assert!(s.close_to_tray && !s.start_with_windows);
+        // 업데이트 확인 설정이 없던 파일도 켜짐으로
+        assert!(s.auto_update);
 
         // 깨진 파일
         std::fs::write(store.dir().join("settings.json"), "{").unwrap();

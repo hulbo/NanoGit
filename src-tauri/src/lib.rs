@@ -3,6 +3,7 @@ mod git;
 mod shell;
 mod store;
 mod tray;
+mod update;
 mod watch;
 
 use std::sync::{Arc, Mutex};
@@ -25,24 +26,30 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(tray::on_window_event)
         .setup(|app| {
-            let store = Store::open(Store::default_dir());
+            let store = Store::open(Store::default_dir(&app.package_info().name));
             let settings = store.load();
             let handle = app.handle().clone();
             let hub = WatchHub::new(Arc::new(move |change| {
                 let _ = handle.emit(commands::EVENT_CHANGED, change);
             }));
-            app.manage(Arc::new(AppCore { store, settings: Mutex::new(settings), hub, busy: Arc::default() }));
+            // 업데이트로 다시 켜졌으면(설치 프로그램이 --tray까지 넘겨도) 창을 띄워 알려 준다
+            let updated_from = update::take_updated_from(store.dir());
+            let show = updated_from.is_some() || !std::env::args().any(|a| a == "--tray");
+            app.manage(Arc::new(AppCore { store, settings: Mutex::new(settings), hub, busy: Arc::default(), updated_from }));
             tray::setup(app.handle())?;
             // Windows 시작 시 자동 실행(--tray)이면 창을 띄우지 않고 트레이에서 감시만 한다
-            if !std::env::args().any(|a| a == "--tray") {
+            if show {
                 tray::show_main(app.handle());
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            update::update_check,
+            update::update_install,
             commands::settings_get,
             commands::settings_save,
             commands::repo_resolve,

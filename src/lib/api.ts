@@ -21,12 +21,17 @@ import type {
   Status,
   TextBlob,
   TrayAction,
+  UpdateInfo,
 } from './types'
 import type { TraySummary } from './tray'
 
 export interface Backend {
   readonly isMock: boolean
   appInfo(): Promise<AppInfo>
+  /** 새 버전이 있으면 그 정보 */
+  updateCheck(): Promise<UpdateInfo | null>
+  /** 새 버전을 받아 설치한다. 앱에서는 설치 프로그램이 뜨고 이 앱은 끝난다 (설치 뒤 다시 켜짐) */
+  updateInstall(onProgress: (got: number, total: number | null) => void): Promise<void>
   settingsGet(): Promise<Settings>
   settingsSave(settings: Settings): Promise<void>
   /** 고른 폴더에서 저장소 루트를 찾는다 */
@@ -89,6 +94,15 @@ async function createTauriBackend(): Promise<Backend> {
   return {
     isMock: false,
     appInfo: () => call('app_info'),
+    updateCheck: () => call('update_check'),
+    async updateInstall(onProgress) {
+      const off = await listen<[number, number | null]>('update://progress', (e) => onProgress(e.payload[0], e.payload[1]))
+      try {
+        await call('update_install')
+      } finally {
+        off()
+      }
+    },
     settingsGet: () => call('settings_get'),
     settingsSave: (settings) => call('settings_save', { settings }),
     repoResolve: (path) => call('repo_resolve', { path }),

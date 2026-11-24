@@ -21,6 +21,8 @@ pub struct AppCore {
     pub hub: Arc<WatchHub>,
     /// 조작이 진행 중인 저장소 (한 저장소에 조작 하나씩)
     pub busy: Arc<Mutex<HashSet<String>>>,
+    /// 업데이트로 다시 켜졌으면 그 전 버전
+    pub updated_from: Option<String>,
 }
 
 /// 저장소 하나를 조작하는 동안 잡아 두는 표시. 끝나면(버려지면) 풀린다
@@ -48,7 +50,7 @@ impl Drop for BusyGuard {
     }
 }
 
-type Core<'a> = State<'a, Arc<AppCore>>;
+pub type Core<'a> = State<'a, Arc<AppCore>>;
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
@@ -66,16 +68,18 @@ pub struct AppInfo {
     git_version: Option<String>,
     git_error: Option<String>,
     data_dir: String,
+    updated_from: Option<String>,
 }
 
 #[tauri::command]
 pub async fn app_info(app: tauri::AppHandle, core: Core<'_>) -> Result<AppInfo, String> {
     let data_dir = display(core.store.dir());
     let version = app.package_info().version.to_string();
+    let updated_from = core.updated_from.clone();
     blocking(move || {
         Ok(match Git::version() {
-            Ok((path, ver)) => AppInfo { version, git_path: Some(path), git_version: Some(ver), git_error: None, data_dir },
-            Err(e) => AppInfo { version, git_path: None, git_version: None, git_error: Some(e), data_dir },
+            Ok((path, ver)) => AppInfo { version, git_path: Some(path), git_version: Some(ver), git_error: None, data_dir, updated_from },
+            Err(e) => AppInfo { version, git_path: None, git_version: None, git_error: Some(e), data_dir, updated_from },
         })
     })
     .await

@@ -26,6 +26,7 @@ tauri-plugin-notification = "2.8.1"
 encoding_rs = "0.8.44"
 dirs = "7.0.0"
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+tauri-plugin-updater = "2.14.1"
 
 [profile.release]
 codegen-units = 1

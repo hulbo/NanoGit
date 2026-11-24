@@ -15,6 +15,7 @@
   import StatusView from './lib/components/StatusView.svelte'
   import Toasts from './lib/components/Toasts.svelte'
   import Toolbar from './lib/components/Toolbar.svelte'
+  import VersionBadge from './lib/components/VersionBadge.svelte'
   import Welcome from './lib/components/Welcome.svelte'
   import { app, OVERVIEW, type View } from './lib/state.svelte'
   import { traySummary } from './lib/tray'
@@ -109,7 +110,7 @@
         <span>저장소 {app.tabs.length}개</span>
         <span class="grow"></span>
         <span class="watch" title="파일·git 변화를 실시간으로 감시합니다"><span class="live"></span>감시 중</span>
-        <span class="muted">NanoGit {app.info?.version ?? ''}</span>
+        <VersionBadge />
       </footer>
     {:else if repo}
       {#key repo.root}
@@ -159,7 +160,7 @@
           <span class="grow"></span>
           <span class="watch" title="파일·git 변화를 실시간으로 감시합니다"><span class="live"></span>감시 중</span>
           <span class="muted">{repo.root}</span>
-          <span class="muted">NanoGit {app.info?.version ?? ''}</span>
+          <VersionBadge />
         </footer>
       {/key}
     {:else}

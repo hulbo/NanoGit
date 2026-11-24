@@ -8,7 +8,15 @@
   function save() {
     app.applyTheme()
     app.setupFetchTimer()
+    app.setupUpdateTimer()
     void app.persist()
+  }
+
+  let checking = $state(false)
+  async function checkNow() {
+    checking = true
+    await app.checkUpdate(true)
+    checking = false
   }
 
   /** Windows 시작 시 실행: 저장할 때 레지스트리에 등록하므로 실패하면 되돌린다 */
@@ -119,7 +127,12 @@
       <small>예: C:\Program Files\JetBrains\IntelliJ IDEA\bin\idea64.exe</small>
     </label>
     <div class="info">
-      <div><span>버전</span>NanoGit {app.info?.version ?? ''}</div>
+      <div class="ver">
+        <span>버전</span>NanoGit {app.info?.version ?? ''}
+        {#if app.update}<button class="ghost" onclick={() => void app.installUpdate()}><Icon name="pull" size={12} />{app.update.version}로 업데이트</button>{/if}
+        <button class="ghost" disabled={checking || app.updateProgress !== null} onclick={checkNow}><Icon name="refresh" size={12} />{checking ? '확인 중…' : '업데이트 확인'}</button>
+        <label class="chk"><input type="checkbox" bind:checked={s.autoUpdate} onchange={save} />자동 확인 (켤 때·6시간마다)</label>
+      </div>
       <div><span>git</span>{app.info?.gitVersion ?? app.info?.gitError ?? ''} <span class="muted">{app.info?.gitPath ?? ''}</span></div>
       <div><span>설정 폴더</span>{app.info?.dataDir ?? ''}</div>
     </div>
@@ -204,6 +217,16 @@
     border-top: 1px solid var(--border-strong);
     font-size: 12px;
     user-select: text;
+  }
+  .ver {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ver .chk {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
   .info span:first-child {
     display: inline-block;

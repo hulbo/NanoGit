@@ -244,6 +244,8 @@ export interface Settings {
   pullMode: PullMode
   /** 커밋한 뒤 바로 push */
   commitPush: boolean
+  /** 켤 때와 몇 시간마다 새 버전 확인 */
+  autoUpdate: boolean
 }
 
 export type HunkAction = 'stage' | 'unstage' | 'discard'
@@ -288,6 +290,18 @@ export interface AppInfo {
   gitVersion: string | null
   gitError: string | null
   dataDir: string
+  /** 업데이트로 다시 켜졌으면 그 전 버전 */
+  updatedFrom?: string | null
+}
+
+/** 새 버전 (GitHub 릴리스) */
+export interface UpdateInfo {
+  version: string
+  /** 지금 버전 */
+  current: string
+  /** 릴리스 노트 */
+  notes: string | null
+  date: string | null
 }
 
 export interface RepoChange {
