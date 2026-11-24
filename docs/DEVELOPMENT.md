@@ -129,7 +129,8 @@ scripts/latest-json.mjs      앱 안 업데이트가 읽는 latest.json 만들�
   앱은 바로 끝나고, 설치가 끝나면 다시 켜져 "업데이트했습니다"를 알립니다(`src-tauri/src/update.rs`, 설정 폴더의 `updated-from.txt`).
 - 서명: 설치본은 개인 키로 서명하고, 앱은 `tauri.conf.json`의 `plugins.updater.pubkey`로 확인합니다.
   - 개인 키: 이 PC의 `%USERPROFILE%\.tauri\nanogit.key` (저장소에 넣지 않음. 잃어버리면 이미 설치된 앱은 새 키로 서명한 업데이트를 받지 못하므로 한 번 더 손으로 설치해야 합니다).
-  - CI: 저장소 Actions secret `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용), `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(비밀번호, 지금은 빈 값).
+  - CI: 저장소 Actions secret `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용, 등록함). 지금 키는 비밀번호가 없어
+    `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`는 등록하지 않았습니다(없으면 빈 값으로 넘어감). 비밀번호 있는 키로 바꾸면 함께 등록합니다.
   - secret이 없으면 main·PR 빌드는 서명 없이 만들고, 태그 빌드는 멈춥니다.
 - 시험: `productName`·`identifier`·`version`과 `endpoints`(로컬 http, `dangerousInsecureTransportProtocol`)를 바꾼 `--config`로 두 버전을 빌드하면
   설치된 NanoGit과 설정(`%APPDATA%\<앱 이름>`)을 건드리지 않고 끝까지 시험할 수 있습니다.
