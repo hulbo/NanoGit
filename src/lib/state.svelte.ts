@@ -54,6 +54,8 @@ export interface FileHistoryTarget {
   /** 처음 고를 커밋 */
   rev?: string | null
   tab?: 'diff' | 'content' | 'blame' | 'worktree'
+  /** 이 줄을 골라 내용을 보인다 (내용으로 찾기) */
+  line?: number
 }
 
 export class Repo {
@@ -366,6 +368,8 @@ class App {
   activeRoot = $state<string | null>(null)
   toasts = $state<Toast[]>([])
   quickOpen = $state(false)
+  /** 내용으로 찾기 (Ctrl+H) */
+  findInFiles = $state(false)
   /** 새 버전 (없으면 null) */
   update = $state<UpdateInfo | null>(null)
   /** 새 버전을 받는 중: 0~1, 전체 크기를 모르면 -1. 받지 않을 때 null */

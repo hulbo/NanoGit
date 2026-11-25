@@ -312,3 +312,38 @@ pub struct LineHistoryEntry {
     pub commit: Commit,
     pub diff: String,
 }
+
+/// 내용으로 찾기 (Ctrl+H, git grep)
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GrepQuery {
+    pub text: String,
+    /// 대소문자 구분
+    pub case_sensitive: bool,
+    /// 단어 단위
+    pub whole_word: bool,
+    /// 정규식 (아니면 글자 그대로)
+    pub regex: bool,
+    /// 파일 마스크: 쉼표로 나눈 패턴 (`*.java, *.xml`, 앞에 !를 붙이면 빼기)
+    pub mask: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrepHit {
+    pub path: String,
+    /// 1부터
+    pub line: u32,
+    /// 보여 줄 줄 내용 (긴 줄은 맞은 곳 앞뒤만)
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrepResult {
+    pub hits: Vec<GrepHit>,
+    /// 맞은 파일 수
+    pub files: u32,
+    /// 너무 많아 앞에서 자름
+    pub truncated: bool,
+}

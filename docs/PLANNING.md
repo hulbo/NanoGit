@@ -224,7 +224,8 @@ AI(Claude Code 등)가 대신 하는 git 작업을 **한눈에 지켜보는 가�
 | 동작 | 키 |
 |---|---|
 | 새로고침 | `F5`, `Ctrl+R` |
-| 파일 찾기 (이력 조회로 열기, `*`·`?` 와일드카드) | `Ctrl+Shift+R` (이클립스 Open Resource), `Ctrl+P` |
+| 파일 찾기 (이력 조회로 열기, `*`·`?` 와일드카드, 이름 다음에 경로) | `Ctrl+Shift+R` (이클립스 Open Resource), `Ctrl+P` |
+| 내용으로 찾기 (git grep → 파일 이력에서 그 줄) | `Ctrl+H` (IntelliJ Find in Files) |
 | 파일 상태 / 히스토리 / 활동 / Push 대기 | `Ctrl+1` / `Ctrl+2` / `Ctrl+3` / `Ctrl+4` |
 | 다음·이전 저장소 탭 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | 커밋 검색 | `Ctrl+F` |
@@ -419,7 +420,7 @@ flowchart LR
 | Command | `diff_get` | 작업 트리 / 스테이지 / 커밋 / 두 버전 diff |
 | Command | `outgoing_get` | push 대기 커밋과 합친 변경 |
 | Command | `activity_get` | reflog 타임라인 |
-| Command | `file_history`, `file_blame`, `file_content`, `line_history`, `files_list` | 파일 이력 |
+| Command | `file_history`, `file_blame`, `file_content`, `line_history`, `files_list`, `content_search` | 파일 이력, 내용으로 찾기 |
 | Command | `fetch` | 원격 가져오기 |
 | Command | `git_op` | 직접 조작 (`{ kind: 'stage' \| 'commit' \| 'push' \| … }`, git이 남긴 글을 돌려줌) |
 | Command | `watch_set` | 감시할 저장소 목록 |

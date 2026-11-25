@@ -311,3 +311,29 @@ export interface RepoChange {
   worktree: boolean
   git: boolean
 }
+
+/** 내용으로 찾기 (Ctrl+H) */
+export interface GrepQuery {
+  text: string
+  caseSensitive: boolean
+  wholeWord: boolean
+  regex: boolean
+  /** 쉼표로 나눈 파일 패턴 (*.java, *.xml, 앞에 !를 붙이면 빼기) */
+  mask: string
+}
+
+export interface GrepHit {
+  path: string
+  /** 1부터 */
+  line: number
+  /** 줄 내용 (앞 들여쓰기를 빼고, 긴 줄은 맞은 곳 앞뒤만) */
+  text: string
+}
+
+export interface GrepResult {
+  hits: GrepHit[]
+  /** 맞은 파일 수 */
+  files: number
+  /** 너무 많아 앞에서 자름 */
+  truncated: boolean
+}

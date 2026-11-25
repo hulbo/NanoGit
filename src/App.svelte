@@ -3,6 +3,7 @@
   import ContextMenu from './lib/components/ContextMenu.svelte'
   import FileHistoryView from './lib/components/FileHistoryView.svelte'
   import FilesView from './lib/components/FilesView.svelte'
+  import FindInFiles from './lib/components/FindInFiles.svelte'
   import HistoryView from './lib/components/HistoryView.svelte'
   import Icon from './lib/components/Icon.svelte'
   import OpDialog from './lib/components/OpDialog.svelte'
@@ -53,7 +54,19 @@
     // Ctrl+Shift+R: 파일 찾기 (이클립스 Open Resource와 같은 키)
     if (e.shiftKey && e.code === 'KeyR') {
       e.preventDefault()
-      if (r) app.quickOpen = true
+      if (r) {
+        app.findInFiles = false
+        app.quickOpen = true
+      }
+      return
+    }
+    // Ctrl+H: 내용으로 찾기 (인텔리제이 Find in Files)
+    if (!e.shiftKey && !e.altKey && e.code === 'KeyH') {
+      e.preventDefault()
+      if (r) {
+        app.quickOpen = false
+        app.findInFiles = true
+      }
       return
     }
     if (e.key === 'Tab') {
@@ -176,6 +189,9 @@
 {/if}
 {#if app.quickOpen && app.active}
   <QuickOpen repo={app.active} />
+{/if}
+{#if app.findInFiles && app.active}
+  <FindInFiles repo={app.active} />
 {/if}
 {#if app.settingsOpen}
   <SettingsDialog />

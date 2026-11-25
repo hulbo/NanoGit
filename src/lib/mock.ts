@@ -2,6 +2,7 @@
 // 이름·메시지는 모두 지어낸 것이다.
 
 import type { Backend } from './api'
+import { grepRegex, maskMatches } from './grep'
 import type {
   ActivityEntry,
   Blame,
@@ -9,6 +10,7 @@ import type {
   CommitDetail,
   FileChange,
   GitOp,
+  GrepHit,
   HistoryEntry,
   OutgoingBranch,
   Refs,
@@ -565,6 +567,23 @@ export function createMockBackend(): Backend {
         { commit: toCommit(byShaMap.get(main[12])!), diff: `diff --git a/${path} b/${path}\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +8,1 @@\n+  const result = parse(value, { strict: false })\n` },
       ]),
     files: () => delay([...FILES, 'docs/메모.md'].sort()),
+    async contentSearch(_root, q) {
+      const re = grepRegex(q)
+      if (!q.text.trim()) return { hits: [], files: 0, truncated: false }
+      if (!re) throw new Error('정규식을 쓸 수 없습니다: 정규식이 올바르지 않습니다')
+      const hits: GrepHit[] = []
+      const files = new Set<string>()
+      for (const path of [...FILES].sort()) {
+        if (!maskMatches(q.mask, path)) continue
+        sampleLines(path).forEach((text, i) => {
+          re.lastIndex = 0
+          if (!re.test(text)) return
+          files.add(path)
+          hits.push({ path, line: i + 1, text: text.trim() })
+        })
+      }
+      return delay({ hits: hits.slice(0, 2000), files: files.size, truncated: hits.length > 2000 }, 250)
+    },
     fetch: () => delay('', 700),
     async op(root, op) {
       await delay(null, op.kind === 'push' || op.kind === 'pull' ? 900 : 200)

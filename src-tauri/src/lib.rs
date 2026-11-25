@@ -86,6 +86,7 @@ pub fn run() {
             commands::file_content,
             commands::line_history,
             commands::files_list,
+            commands::content_search,
             commands::fetch,
             commands::git_op,
             commands::watch_set,

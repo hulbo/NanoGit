@@ -81,6 +81,9 @@
   <button class="tool" title="파일을 찾아 이력 조회 (Ctrl+Shift+R, Ctrl+P) · *, ?로 like 검색" onclick={() => (app.quickOpen = true)}>
     <span class="ic"><Icon name="search" size={20} /></span><span class="lb">파일 찾기</span>
   </button>
+  <button class="tool" title="파일 내용에서 찾기 (Ctrl+H) · 결과를 고르면 그 파일의 이력에서 그 줄을 봅니다" onclick={() => (app.findInFiles = true)}>
+    <span class="ic"><Icon name="lines" size={20} /></span><span class="lb">내용 찾기</span>
+  </button>
   <span class="grow"></span>
   {#if repo.busy}<span class="busy" title="진행 중인 조작"><span class="ic spin"><Icon name="refresh" size={14} /></span>{repo.busy} 중…</span>{/if}
   <button class="tool" title="새로고침 (F5)" disabled={repo.refreshing} onclick={refresh}>

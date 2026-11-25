@@ -376,9 +376,85 @@ pub fn count_authors(out: &str) -> Vec<Author> {
     list
 }
 
+/// 결과 줄에 보여 줄 글자 수 (긴 줄은 맞은 곳 앞뒤만)
+const GREP_TEXT_CHARS: usize = 300;
+
+/// `git grep -n --column -z` 출력: `경로\0줄\0칸\0내용\n`. 칸은 맞은 곳의 바이트 위치(1부터).
+/// (결과, 맞은 파일 수, max에서 잘렸는지)
+pub fn parse_grep(out: &[u8], max: usize) -> (Vec<GrepHit>, u32, bool) {
+    let mut hits = Vec::new();
+    let mut files = 0u32;
+    let mut last: Option<&[u8]> = None;
+    let mut truncated = false;
+    for rec in out.split(|&b| b == b'\n') {
+        let mut parts = rec.splitn(4, |&b| b == 0);
+        let (Some(path), Some(line), Some(col), Some(text)) = (parts.next(), parts.next(), parts.next(), parts.next()) else { continue };
+        let Ok(line) = std::str::from_utf8(line).unwrap_or("").parse::<u32>() else { continue };
+        if last != Some(path) {
+            files += 1;
+            last = Some(path);
+        }
+        if hits.len() >= max {
+            truncated = true;
+            continue;
+        }
+        let col = std::str::from_utf8(col).ok().and_then(|c| c.parse::<usize>().ok()).unwrap_or(1).max(1);
+        let text = text.strip_suffix(b"\r").unwrap_or(text);
+        hits.push(GrepHit { path: super::decode(path).0, line, text: grep_window(text, col) });
+    }
+    (hits, files, truncated)
+}
+
+/// 줄 내용: 앞 들여쓰기를 빼고, 길면 맞은 곳(바이트 위치 col) 앞뒤만 남긴다
+fn grep_window(text: &[u8], col: usize) -> String {
+    let at = super::decode(&text[..(col - 1).min(text.len())]).0.chars().count();
+    let chars: Vec<char> = super::decode(text).0.chars().collect();
+    let indent = chars.iter().take_while(|c| c.is_whitespace()).count();
+    let start = if at > indent + 120 { at - 60 } else { indent };
+    let end = (start + GREP_TEXT_CHARS).min(chars.len());
+    let mut s = String::new();
+    if start > indent {
+        s.push('…');
+    }
+    s.extend(&chars[start..end]);
+    if end < chars.len() {
+        s.push('…');
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grep_records() {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"src/a.ts\x0012\x005\x00    const x = find()\r\n");
+        out.extend_from_slice(b"src/a.ts\x0020\x001\x00find()\n");
+        out.extend_from_slice("문서/메모.md\x003\x0010\x00한글 find 줄\n".as_bytes());
+        let (hits, files, truncated) = parse_grep(&out, 10);
+        assert_eq!(files, 2);
+        assert!(!truncated);
+        assert_eq!(hits[0], GrepHit { path: "src/a.ts".into(), line: 12, text: "const x = find()".into() });
+        assert_eq!(hits[2].path, "문서/메모.md");
+        assert_eq!(hits[2].text, "한글 find 줄");
+
+        // 많으면 앞에서 자르고, 파일 수는 끝까지 센다
+        let (hits, files, truncated) = parse_grep(&out, 1);
+        assert_eq!((hits.len(), files, truncated), (1, 2, true));
+    }
+
+    #[test]
+    fn grep_long_line_keeps_match() {
+        let line = format!("{}needle{}", "a".repeat(500), "b".repeat(500));
+        let out = format!("min.js\x001\x00501\x00{line}\n");
+        let (hits, _, _) = parse_grep(out.as_bytes(), 10);
+        let t = &hits[0].text;
+        assert!(t.starts_with('…') && t.ends_with('…'), "{t}");
+        assert!(t.contains("needle"));
+        assert!(t.chars().count() <= 302);
+    }
 
     #[test]
     fn authors_by_count() {

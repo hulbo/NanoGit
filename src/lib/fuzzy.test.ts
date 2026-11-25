@@ -40,7 +40,7 @@ describe('와일드카드(like) 검색', () => {
   it('끝에는 *가 붙은 것으로 본다 (이클립스처럼 앞에서부터 맞춤)', () => {
     expect(searchFiles('Pt*Service', files).list).toEqual([files[3]])
     expect(searchFiles('*mapper_ora*', files).list).toEqual([files[4]])
-    expect(searchFiles('edu*', files).list).toEqual([files[0]])
+    expect(searchFiles('edu*', files).list[0]).toBe(files[0])
     expect(searchFiles('*.md', files).list).toEqual(['README.md'])
   })
 
@@ -55,9 +55,26 @@ describe('와일드카드(like) 검색', () => {
     expect(searchFiles('apper/*', files).total).toBe(0)
   })
 
+  it('이름에서 맞는 파일 다음에 경로 전체에서 맞는 파일', () => {
+    const paths = ['apps/isbm/src/main/resources/application.yml', 'apps/link/src/main/resources/application.yml', 'apps/isbm/src/main/resources/isbm-application.yml']
+    // 이름에 isbm과 appli가 다 있는 것이 먼저, 그다음 경로에서
+    expect(searchFiles('*isbm*appli*.yml', paths).list).toEqual([paths[2], paths[0]])
+    expect(searchFiles('isbm*appli*', paths).list).toEqual([paths[2], paths[0]])
+    expect(searchFiles('*link*appli*', paths).list).toEqual([paths[1]])
+    // 이름에서 맞으면 앞에
+    expect(searchFiles('edu*', files).list).toEqual([files[0], files[1], files[2]])
+  })
+
+  it("'/'는 그 사이 폴더를 건너뛸 수 있다", () => {
+    const paths = ['apps/isbm/src/main/resources/application.yml', 'apps/link/src/main/resources/application.yml']
+    expect(searchFiles('*link/appli*yml', paths).list).toEqual([paths[1]])
+    expect(searchFiles('link/appli*', paths).list).toEqual([paths[1]])
+    expect(searchFiles('ink/appli*', paths).total).toBe(0)
+  })
+
   it('정규식 특수 문자는 글자 그대로', () => {
     expect(isWildcard('a.b')).toBe(false)
     expect(searchFiles('*(x)*', ['a(x).ts', 'ax.ts']).list).toEqual(['a(x).ts'])
-    expect(wildcardPattern('a.b*').re.test('aXb.ts')).toBe(false)
+    expect(wildcardPattern('a.b*').re?.test('aXb.ts')).toBe(false)
   })
 })

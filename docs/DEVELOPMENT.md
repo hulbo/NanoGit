@@ -32,7 +32,7 @@ npm run tauri build   # 설치본 빌드 → src-tauri/target/release/bundle/nsi
 
 ```powershell
 npm run check                                   # Svelte·TypeScript 타입 검사
-npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 트레이·저장소 요약, 시간 표시, 파일 찾기)
+npm test                                        # 화면 단위 테스트 (그래프, diff, 활동 분류, 알림, 트레이·저장소 요약, 시간 표시, 파일·내용 찾기)
 cargo test --manifest-path src-tauri/Cargo.toml # 백엔드 테스트 (파서 + 실제 git 저장소로 조회·reflog·감시)
 ```
 
@@ -60,20 +60,22 @@ src/                         화면 (Svelte 5 + TypeScript)
   lib/notify.ts              새 활동 → Windows 알림 (종류별 켜기·끄기, 많으면 묶기)
   lib/tray.ts                트레이 툴팁·메뉴에 보일 저장소 요약
   lib/overview.ts            저장소 요약 화면: 마지막 변화, 최근 바뀐 파일, 경고 수, 전체 활동 합치기
-  lib/fuzzy.ts               파일 찾기: 퍼지 검색, *·? 와일드카드(like) 검색
+  lib/fuzzy.ts               파일 찾기: 퍼지 검색, *·? 와일드카드(like) 검색 (이름 다음에 경로)
+  lib/grep.ts                내용으로 찾기: 맞은 곳 칠하기, 파일 마스크
   lib/format.ts              시간·경로 표시
   lib/menus.ts               파일·커밋·브랜치·태그·stash 우클릭 메뉴
   lib/actions.ts             직접 조작 흐름 (확인·입력 대화상자 → 조작 → 알림)
   lib/dialog.ts              조작 대화상자(OpDialog)의 입력 칸 모양
   lib/components/            RepoTabs, Toolbar, Sidebar, HistoryView, StatusView, ActivityView,
-                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, CodeText, OpDialog, ...
+                             OutgoingView, FileHistoryView, FilesView, DiffView, CodeView, CodeText, OpDialog,
+                             QuickOpen(Ctrl+Shift+R), FindInFiles(Ctrl+H), ...
 src-tauri/src/               백엔드 (Rust, Tauri 2)
   lib.rs                     앱 시작, 명령 등록
   commands.rs                IPC 명령 (모두 별도 스레드에서 git 실행)
   git/mod.rs                 git 찾기·실행(창 없이, 제한 시간, GIT_OPTIONAL_LOCKS=0), 저장소 찾기, 인코딩
   git/parse.rs               log·status·raw/numstat·blame·reflog 출력 해석
   git/query.rs               조회: 상태, 참조, 히스토리(메시지·작성자 검색, 커밋 ID 찾기, 작성자 목록), 커밋, diff,
-                             push 대기, 파일 이력, blame, 줄 이력
+                             push 대기, 파일 이력, blame, 줄 이력, 내용으로 찾기(git grep)
   git/ops.rs                 직접 조작: 스테이지·헝크·버리기(휴지통), 커밋, push·pull, 브랜치·병합·stash·태그
   git/reflog.rs              활동 타임라인 (reflog 파일 직접 읽기, 버려진 커밋 수)
   git/model.rs               화면으로 보내는 데이터

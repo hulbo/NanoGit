@@ -1,12 +1,14 @@
 <script lang="ts">
-  // 파일 이력 (강화): 이름 변경 추적, 커밋별 변경, 두 버전 비교, 그 버전 내용, blame, 작업 트리와 비교, 선택한 줄의 이력
+  // 파일 이력 (강화): 이름 변경 추적, 커밋별 변경, 두 버전 비교, 그 버전 내용, blame, 작업 트리와 비교, 선택한 줄의 이력.
+  // 파일 상태에서 바뀐 파일이면 맨 위에 "커밋하지 않은 변경 (지금 파일)"을 따로 보인다 (이력과 함께 지금 상태도 보도록)
   import { errorMessage } from '../api'
   import { parseDiff, unifiedRows, type UnifiedRow } from '../diff'
   import { highlightDiff } from '../highlight'
   import { basename, dateTime, initial, nameHue, shortDate, short } from '../format'
   import { commitMenu, fileMenu } from '../menus'
+  import { untrack } from 'svelte'
   import { app, type Repo } from '../state.svelte'
-  import type { Blame, CommitDetail, DiffTarget, HistoryEntry, LineHistoryEntry, TextBlob } from '../types'
+  import type { Blame, CommitDetail, DiffTarget, HistoryEntry, LineHistoryEntry, TextBlob, WorkFile } from '../types'
   import CodeText from './CodeText.svelte'
   import CodeView, { type BlameCell } from './CodeView.svelte'
   import DiffView from './DiffView.svelte'
@@ -18,6 +20,8 @@
 
   type Tab = 'diff' | 'content' | 'blame' | 'worktree'
   const PAGE = 300
+  /** 맨 위 "커밋하지 않은 변경" 줄의 표시 (커밋 해시 자리) */
+  const WT = 'worktree'
 
   const target = $derived(repo.fileHistory)
   let follow = $state(true)
@@ -39,6 +43,9 @@
   let range = $state<[number, number] | null>(null)
   let lineHist = $state<{ range: [number, number]; path: string; list: LineHistoryEntry[] } | null>(null)
   let lineLoading = $state(false)
+  /** 이 줄로 가서 골라 둔다 (내용으로 찾기에서 열었을 때) */
+  let pendingLine: number | null = null
+  let scrollLine = $state<number | null>(null)
   let seq = 0
   let lseq = 0
 
@@ -47,7 +54,9 @@
     const t = target
     void follow
     if (!t) return
-    tab = t.tab ?? 'diff'
+    tab = t.line ? 'content' : (t.tab ?? 'diff')
+    pendingLine = t.line ?? null
+    scrollLine = null
     picks = []
     entries = []
     lineHist = null
@@ -67,8 +76,10 @@
       entries = reset ? list : [...entries, ...list]
       done = list.length < PAGE
       if (reset) {
-        const first = (want && list.find((e) => e.commit.sha === want)) || list[0]
-        picks = first ? [first.commit.sha] : []
+        // 정한 커밋 → 커밋하지 않은 변경(있으면) → 마지막 커밋
+        const first = want ? list.find((e) => e.commit.sha === want) : null
+        picks = first ? [first.commit.sha] : work ? [WT] : list[0] ? [list[0].commit.sha] : []
+        if (picks[0] === WT && tab === 'worktree') tab = 'diff'
       }
     } catch (e) {
       if (my === lseq) listError = errorMessage(e)
@@ -83,17 +94,67 @@
     return entries.filter((e) => e.commit.subject.toLowerCase().includes(q) || e.commit.author.toLowerCase().includes(q) || e.commit.sha.startsWith(q))
   })
 
-  const selected = $derived(picks.map((s) => entries.find((e) => e.commit.sha === s)).filter((e): e is HistoryEntry => !!e))
-  /** 두 개를 고르면 오래된 것 → 최근 것 */
+  const currentPath = $derived(entries[0]?.path ?? target?.path ?? '')
+
+  /** 아직 커밋하지 않은 지금 파일: 파일 상태(스테이지·작업 트리·충돌)에 이 파일이 있으면 */
+  const work = $derived.by(() => {
+    const s = repo.status
+    const p = currentPath
+    if (!s || !p) return null
+    const same = (f: WorkFile) => f.path === p
+    const conflicted = s.conflicted.find(same)
+    const unstaged = s.unstaged.find(same)
+    const staged = s.staged.find(same)
+    const f = conflicted ?? unstaged ?? staged
+    if (!f) return null
+    const mtime = Math.max(0, ...[conflicted, unstaged, staged].map((x) => x?.mtime ?? 0))
+    return { path: p, status: f.status, staged: !!staged, unstaged: !!unstaged, conflicted: !!conflicted, mtime }
+  })
+  /** 맨 위 줄로 쓰는 이력 항목 (커밋 해시 자리에 WT) */
+  const workEntry = $derived<HistoryEntry | null>(
+    work
+      ? {
+          commit: { sha: WT, parents: [], author: '', email: '', time: Math.floor(work.mtime / 1000), subject: '커밋하지 않은 변경 (지금 파일)', refs: [] },
+          path: work.path,
+          oldPath: null,
+          status: work.status,
+          additions: null,
+          deletions: null,
+        }
+      : null,
+  )
+  const all = $derived(workEntry ? [workEntry, ...entries] : entries)
+  const isWork = (h: HistoryEntry | null | undefined) => h?.commit.sha === WT
+  const workText = $derived(
+    work ? [work.conflicted && '충돌', work.staged && '스테이지됨', work.unstaged && (work.status === '?' ? '새 파일' : '작업 트리에서 수정')].filter(Boolean).join(' · ') : '',
+  )
+
+  const selected = $derived(picks.map((s) => all.find((e) => e.commit.sha === s)).filter((e): e is HistoryEntry => !!e))
+  /** 두 개를 고르면 오래된 것 → 최근 것 (커밋하지 않은 변경이 가장 최근) */
   const pair = $derived.by(() => {
     if (selected.length !== 2) return null
     const [a, b] = selected
-    const ia = entries.indexOf(a)
-    const ib = entries.indexOf(b)
+    const ia = all.indexOf(a)
+    const ib = all.indexOf(b)
     return ia > ib ? { older: a, newer: b } : { older: b, newer: a }
   })
   const one = $derived(selected.length === 1 ? selected[0] : null)
-  const currentPath = $derived(entries[0]?.path ?? target?.path ?? '')
+
+  // 커밋하지 않은 변경이 없어지면(커밋·버리기) 그 줄을 고른 것도 풀고, 새 커밋이 생기면 목록을 다시 읽는다
+  $effect(() => {
+    if (picks.includes(WT) && !work && entries.length) picks = [entries[0].commit.sha]
+  })
+  let lastHead: string | null = null
+  $effect(() => {
+    const head = repo.status?.head ?? null
+    if (lastHead && head && head !== lastHead) {
+      untrack(() => {
+        const keep = picks.find((p) => p !== WT) ?? null
+        void load(true, keep)
+      })
+    }
+    lastHead = head
+  })
 
   function click(e: MouseEvent, h: HistoryEntry) {
     const sha = h.commit.sha
@@ -103,42 +164,67 @@
       if (picks.length === 2) tab = 'diff'
     } else {
       picks = [sha]
+      if (sha === WT && tab === 'worktree') tab = 'diff'
     }
   }
 
-  // 오른쪽 보기 읽기
+  /** 커밋하지 않은 변경: 마지막 커밋 → 지금 파일 (커밋된 적 없는 새 파일이면 전체가 추가) */
+  function workDiff(h: HistoryEntry): DiffTarget {
+    const isNew = !entries.length || h.status === '?' || h.status === 'A'
+    return isNew ? { kind: 'worktree', path: h.path, untracked: true } : { kind: 'revToWorktree', rev: 'HEAD', revPath: h.path, path: h.path }
+  }
+
+  // 오른쪽 보기 읽기. 커밋하지 않은 변경을 보고 있으면 파일이 바뀔 때마다 (보던 자리 그대로) 다시 읽는다
   const viewKey = $derived(`${tab}|${picks.join(',')}|${app.settings.ignoreWhitespace}|${entries.length > 0}`)
+  const liveKey = $derived(picks.includes(WT) && work ? `${work.mtime}|${work.status}|${work.staged}|${work.unstaged}|${repo.indexSeq}` : '')
+  let lastKey = ''
   $effect(() => {
-    void viewKey
+    void liveKey
+    const key = viewKey
     const t = tab
     const p = pair
     const o = one
     const opts = { ignoreWhitespace: app.settings.ignoreWhitespace }
     const my = ++seq
-    blob = null
-    content = null
-    blame = null
-    viewError = null
-    range = null
+    const fresh = key !== lastKey
+    lastKey = key
+    if (fresh) {
+      blob = null
+      content = null
+      blame = null
+      viewError = null
+      range = null
+    }
     if (!target) return
+    /** 커밋이면 그 해시, 지금 파일이면 null */
+    const revOf = (h: HistoryEntry | null) => (h && !isWork(h) ? h.commit.sha : null)
     let job: Promise<unknown> | null = null
     if (t === 'diff' || t === 'worktree') {
       let dt: DiffTarget | null = null
-      if (t === 'diff' && p) dt = { kind: 'blobs', aRev: p.older.commit.sha, aPath: p.older.path, bRev: p.newer.commit.sha, bPath: p.newer.path }
+      if (t === 'diff' && p && isWork(p.newer)) dt = { kind: 'revToWorktree', rev: p.older.commit.sha, revPath: p.older.path, path: p.newer.path }
+      else if (t === 'diff' && p) dt = { kind: 'blobs', aRev: p.older.commit.sha, aPath: p.older.path, bRev: p.newer.commit.sha, bPath: p.newer.path }
+      else if (t === 'diff' && o && isWork(o)) dt = workDiff(o)
       else if (t === 'diff' && o) dt = { kind: 'commit', sha: o.commit.sha, path: o.path, oldPath: o.oldPath }
-      else if (t === 'worktree' && o) dt = { kind: 'revToWorktree', rev: o.commit.sha, revPath: o.path, path: currentPath }
+      else if (t === 'worktree' && o && !isWork(o)) dt = { kind: 'revToWorktree', rev: o.commit.sha, revPath: o.path, path: currentPath }
       if (dt) job = app.backend.diff(repo.root, dt, opts).then((b) => my === seq && (blob = b))
     } else if (t === 'content') {
-      const rev = o ? o.commit.sha : null
       const path = o ? o.path : target.path
-      job = app.backend.fileContent(repo.root, path, rev).then((b) => my === seq && (content = b))
+      job = app.backend.fileContent(repo.root, path, revOf(o)).then((b) => {
+        if (my !== seq) return
+        content = b
+        // 내용으로 찾기에서 열었으면 그 줄을 골라 보인다
+        if (pendingLine) {
+          range = [pendingLine, pendingLine]
+          scrollLine = pendingLine
+          pendingLine = null
+        }
+      })
     } else if (t === 'blame') {
-      const rev = o ? o.commit.sha : null
       const path = o ? o.path : target.path
-      job = app.backend.blame(repo.root, path, rev).then((b) => my === seq && (blame = b))
+      job = app.backend.blame(repo.root, path, revOf(o)).then((b) => my === seq && (blame = b))
     }
     if (!job) return
-    viewLoading = true
+    if (fresh) viewLoading = true
     job
       .catch((e) => my === seq && (viewError = errorMessage(e)))
       .finally(() => my === seq && (viewLoading = false))
@@ -148,7 +234,7 @@
   $effect(() => {
     const o = one
     detail = null
-    if (!o) return
+    if (!o || isWork(o)) return
     const sha = o.commit.sha
     app.backend
       .commit(repo.root, sha)
@@ -191,7 +277,7 @@
     const r = range
     lineLoading = true
     try {
-      const list = await app.backend.lineHistory(repo.root, path, r[0], r[1], o ? o.commit.sha : null)
+      const list = await app.backend.lineHistory(repo.root, path, r[0], r[1], o && !isWork(o) ? o.commit.sha : null)
       lineHist = { range: r, path, list }
     } catch (e) {
       app.toast(errorMessage(e), 'error')
@@ -202,7 +288,7 @@
 
   function jumpTo(sha: string) {
     if (/^0+$/.test(sha)) return
-    if (entries.some((e) => e.commit.sha === sha)) {
+    if (sha !== WT && entries.some((e) => e.commit.sha === sha)) {
       picks = [sha]
       tab = 'diff'
     } else void repo.reveal(sha)
@@ -241,6 +327,30 @@
               <div class="list">
                 <div class="hint muted">커밋 {entries.length}{done ? '' : '+'}개 · Ctrl+클릭으로 두 버전 비교</div>
                 {#if listError}<div class="empty err">{listError}</div>{/if}
+                {#if workEntry && work}
+                  <button
+                    class="hrow work"
+                    class:sel={picks.includes(WT)}
+                    title="아직 커밋하지 않은 지금 파일입니다. 변경 내용은 마지막 커밋 → 지금 파일"
+                    onclick={(e) => click(e, workEntry)}
+                    oncontextmenu={(e) => {
+                      if (!picks.includes(WT)) picks = [WT]
+                      app.openMenu(e, fileMenu(repo, { path: work.path, deleted: work.status === 'D' }))
+                    }}
+                  >
+                    <span class="wicon"><Icon name="editor" size={13} /></span>
+                    <span class="body">
+                      <span class="l1">
+                        <span class="st st-{work.status}">{work.status}</span>
+                        <span class="subj">커밋하지 않은 변경 (지금 파일)</span>
+                      </span>
+                      <span class="l2">{workText}{work.mtime ? ` · ${shortDate(work.mtime / 1000)} 저장` : ''}</span>
+                    </span>
+                    {#if picks.length === 2 && picks.includes(WT)}
+                      <span class="ab">B</span>
+                    {/if}
+                  </button>
+                {/if}
                 {#each shown as h (h.commit.sha)}
                   <button
                     class="hrow"
@@ -283,7 +393,15 @@
             {/snippet}
             {#snippet b()}
               <div class="info">
-                {#if detail}
+                {#if one && isWork(one) && work}
+                  <div class="msg">
+                    <b>커밋하지 않은 변경 (지금 파일)</b>
+                    <div class="muted small">{workText}{work.mtime ? ` · 마지막 저장 ${dateTime(work.mtime / 1000, true)}` : ''}</div>
+                    <div class="muted small">
+                      변경 내용: 마지막 커밋 → 지금 파일 · 이 버전 내용·Blame: 지금 파일. 파일이 바뀌면 바로 다시 읽습니다.
+                    </div>
+                  </div>
+                {:else if detail}
                   <div class="msg">
                     <b>{detail.message.split('\n')[0]}</b>
                     <div class="muted small">{detail.author} · {dateTime(detail.time, true)} · <span class="mono">{short(detail.sha, 10)}</span></div>
@@ -300,7 +418,7 @@
                 {:else if pair}
                   <div class="msg">
                     <div><span class="ab">A</span> {pair.older.commit.subject} <span class="mono muted">{short(pair.older.commit.sha)}</span></div>
-                    <div><span class="ab">B</span> {pair.newer.commit.subject} <span class="mono muted">{short(pair.newer.commit.sha)}</span></div>
+                    <div><span class="ab">B</span> {pair.newer.commit.subject} {#if !isWork(pair.newer)}<span class="mono muted">{short(pair.newer.commit.sha)}</span>{/if}</div>
                     <div class="muted small">A의 {basename(pair.older.path)} → B의 {basename(pair.newer.path)} 비교</div>
                   </div>
                 {:else}
@@ -314,7 +432,7 @@
           <div class="right">
             <div class="tabs">
               {#each TABS as [t, label, icon] (t)}
-                <button class:on={tab === t} disabled={t !== 'diff' && !!pair} onclick={() => (tab = t)}>
+                <button class:on={tab === t} disabled={(t !== 'diff' && !!pair) || (t === 'worktree' && isWork(one))} onclick={() => (tab = t)}>
                   <Icon name={icon as 'compare'} size={13} />{t === 'diff' && pair ? '두 버전 비교 (A → B)' : label}
                 </button>
               {/each}
@@ -359,7 +477,15 @@
                   {blob}
                   loading={viewLoading}
                   error={viewError}
-                  title={pair ? `A ${short(pair.older.commit.sha)}:${pair.older.path} → B ${short(pair.newer.commit.sha)}:${pair.newer.path}` : one ? (tab === 'worktree' ? `${short(one.commit.sha)}:${one.path} → 작업 트리 ${currentPath}` : `${short(one.commit.sha)} · ${one.path}`) : ''}
+                  title={pair
+                    ? `A ${short(pair.older.commit.sha)}:${pair.older.path} → B ${isWork(pair.newer) ? '지금 파일' : `${short(pair.newer.commit.sha)}:${pair.newer.path}`}`
+                    : one && isWork(one)
+                      ? `마지막 커밋 → 지금 파일 · ${one.path}`
+                      : one
+                        ? tab === 'worktree'
+                          ? `${short(one.commit.sha)}:${one.path} → 작업 트리 ${currentPath}`
+                          : `${short(one.commit.sha)} · ${one.path}`
+                        : ''}
                   emptyText={tab === 'worktree' ? '커밋을 하나 고르면 지금 파일과 비교합니다' : '커밋을 고르세요'}
                 />
               {:else if viewError}
@@ -370,7 +496,7 @@
                 {#if content.binary}
                   <div class="empty">이진 파일입니다 ({content.size.toLocaleString()} 바이트)</div>
                 {:else}
-                  <CodeView lines={contentLines} path={one ? one.path : target.path} {range} onrange={(r) => (range = r)} />
+                  <CodeView lines={contentLines} path={one ? one.path : target.path} {range} scrollTo={scrollLine} onrange={(r) => (range = r)} />
                 {/if}
               {:else if tab === 'blame' && blame}
                 <CodeView lines={blameLines} path={one ? one.path : target.path} blame={blameCells} {range} onrange={(r) => (range = r)} onblame={jumpTo} />
@@ -443,6 +569,30 @@
   }
   .hrow.sel {
     background: var(--sel);
+  }
+  /* 커밋하지 않은 지금 파일: 커밋 줄과 다르게 (점선 테두리, 왼쪽 띠, 연필) */
+  .hrow.work {
+    border-left: 3px solid var(--st-modified);
+    border-bottom: 1px dashed var(--border-strong);
+    background: color-mix(in srgb, var(--st-modified) 7%, transparent);
+  }
+  .hrow.work.sel {
+    background: color-mix(in srgb, var(--st-modified) 16%, var(--sel));
+  }
+  .hrow.work .subj {
+    color: var(--st-modified);
+    font-weight: 600;
+  }
+  .wicon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border: 1px dashed var(--st-modified);
+    border-radius: 50%;
+    color: var(--st-modified);
+    flex: none;
   }
   .avatar {
     display: grid;

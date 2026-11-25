@@ -35,7 +35,7 @@ function workItems(repo: Repo, w: NonNullable<FileRef['work']>): MenuEntry[] {
 export function fileMenu(repo: Repo, f: FileRef): MenuEntry[] {
   const abs = joinPath(repo.root, f.path)
   const items: MenuEntry[] = [
-    { label: '이력 조회', icon: 'history', shortcut: 'Ctrl+H', action: () => repo.openFileHistory({ path: f.path, rev: f.rev ?? null, tab: 'diff' }) },
+    { label: '이력 조회', icon: 'history', action: () => repo.openFileHistory({ path: f.path, rev: f.rev ?? null, tab: 'diff' }) },
     { label: 'Blame (줄마다 마지막 변경)', icon: 'blame', action: () => repo.openFileHistory({ path: f.path, rev: f.rev ?? null, tab: 'blame' }) },
   ]
   if (f.rev) {

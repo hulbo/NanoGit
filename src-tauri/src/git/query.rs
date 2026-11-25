@@ -13,6 +13,8 @@ const MAX_STATUS: usize = 5000;
 const MAX_TEXT: usize = 4 * 1024 * 1024;
 /// push 대기 커밋을 이보다 많이 담지 않는다
 const MAX_OUTGOING: u32 = 500;
+/// 내용으로 찾기 결과 수 (넘으면 앞에서 자름)
+const MAX_GREP: usize = 2000;
 
 impl Git {
     pub fn status(&self) -> Result<Status, String> {
@@ -410,6 +412,43 @@ impl Git {
         Ok(out.split('\0').filter(|p| !p.is_empty()).map(String::from).collect())
     }
 
+    /// 내용으로 찾기 (Ctrl+H): 작업 트리의 파일(추적 중 + 무시하지 않은 새 파일, 이진 파일 제외)에서 git grep.
+    /// 정규식은 PCRE(-P), 쓸 수 없는 git이면 확장 정규식(-E)
+    pub fn grep(&self, q: &GrepQuery) -> Result<GrepResult, String> {
+        let text = q.text.trim_end_matches(['\r', '\n']);
+        if text.trim().is_empty() {
+            return Ok(GrepResult { hits: Vec::new(), files: 0, truncated: false });
+        }
+        if text.chars().count() > 500 || text.contains(['\n', '\0']) {
+            return Err("검색어는 한 줄, 500자까지입니다".into());
+        }
+        let specs = grep_pathspecs(&q.mask);
+        let run = |engine: &str| {
+            let mut args = vec!["grep", "-n", "--column", "-z", "-I", "--untracked", "--no-color", "--full-name", engine];
+            if !q.case_sensitive {
+                args.push("-i");
+            }
+            if q.whole_word {
+                args.push("-w");
+            }
+            // -e로 넘겨 '-'로 시작하는 검색어도 옵션이 되지 않게 한다
+            args.extend(["-e", text, "--"]);
+            args.extend(specs.iter().map(String::as_str));
+            self.run_raw(&args, None, SLOW, &[1])
+        };
+        let out = if q.regex {
+            match run("-P") {
+                Err(e) if e.contains("Perl") || e.contains("PCRE") => run("-E"),
+                r => r,
+            }
+            .map_err(|e| format!("정규식을 쓸 수 없습니다: {e}"))?
+        } else {
+            run("-F")?
+        };
+        let (hits, files, truncated) = parse_grep(&out.stdout, MAX_GREP);
+        Ok(GrepResult { hits, files, truncated: truncated || out.truncated })
+    }
+
     /// push 대기 커밋. `all`이면 대기 커밋이 있는 모든 로컬 브랜치
     pub fn outgoing(&self, all: bool) -> Result<Vec<OutgoingBranch>, String> {
         let refs = self.refs()?;
@@ -554,6 +593,29 @@ fn mtime_ms(p: &Path) -> Option<i64> {
     let m = std::fs::metadata(p).ok()?.modified().ok()?;
     let d = m.duration_since(std::time::UNIX_EPOCH).ok()?;
     i64::try_from(d.as_millis()).ok()
+}
+
+/// 파일 마스크(`*.java, *.xml, !*.min.js`) → git pathspec. 이름 패턴은 모든 폴더에서, '/'가 있으면 경로로 본다
+fn grep_pathspecs(mask: &str) -> Vec<String> {
+    let mut specs = Vec::new();
+    for pat in mask.split([',', ';']).map(str::trim) {
+        let (exclude, pat) = match pat.strip_prefix('!') {
+            Some(p) => (true, p.trim()),
+            None => (false, pat),
+        };
+        // 비었거나 모든 파일이면 넣지 않는다
+        if pat.is_empty() || pat == "*" || pat == "*.*" || pat.contains('\0') {
+            continue;
+        }
+        let pat = pat.replace('\\', "/");
+        let glob = if pat.contains('/') { pat.trim_start_matches('/').to_string() } else { format!("**/{pat}") };
+        specs.push(format!(":({}glob,icase){glob}", if exclude { "exclude," } else { "" }));
+    }
+    // 빼기만 있으면 전체에서 뺀다
+    if !specs.is_empty() && specs.iter().all(|p| p.starts_with(":(exclude")) {
+        specs.insert(0, ":(glob)**".into());
+    }
+    specs
 }
 
 #[cfg(test)]
@@ -715,6 +777,50 @@ pub(crate) mod tests {
         assert_eq!(refs.remotes[0].name, "origin");
         assert_eq!(refs.tags[0].name, "v0.1");
         assert!(git.branches_containing(&log[2].sha).unwrap().contains(&"origin/main".to_string()));
+    }
+
+    #[test]
+    fn grep_with_real_git() {
+        if find_git().is_err() {
+            return;
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        sh(dir, &["init", "-q"]);
+        std::fs::create_dir_all(dir.join("src/web")).unwrap();
+        std::fs::write(dir.join("src/web/Login.java"), "class Login {\n    void findUser() {}\n    // FIND me\n}\n").unwrap();
+        std::fs::write(dir.join("src/app.ts"), "const finder = 1\nlet x = find(1)\n").unwrap();
+        std::fs::write(dir.join("메모.txt"), "한글 메모: 찾을 글\n").unwrap();
+        std::fs::write(dir.join(".gitignore"), "ignored.txt\n").unwrap();
+        std::fs::write(dir.join("ignored.txt"), "find\n").unwrap();
+        std::fs::write(dir.join("data.bin"), b"find\0\x01").unwrap();
+        sh(dir, &["add", "."]);
+        sh(dir, &["commit", "-q", "-m", "처음"]);
+        std::fs::write(dir.join("새 파일.txt"), "find in untracked\n").unwrap();
+        let git = Git::open(dir).unwrap();
+        let find = |text: &str, f: &dyn Fn(&mut GrepQuery)| {
+            let mut q = GrepQuery { text: text.into(), ..Default::default() };
+            f(&mut q);
+            let r = git.grep(&q).unwrap();
+            r.hits.iter().map(|h| format!("{}:{}", h.path, h.line)).collect::<Vec<_>>()
+        };
+
+        // 대소문자 무시, 새 파일 포함, 무시한 파일·이진 파일 빼기
+        assert_eq!(find("find", &|_| {}), vec!["src/app.ts:1", "src/app.ts:2", "src/web/Login.java:2", "src/web/Login.java:3", "새 파일.txt:1"]);
+        assert_eq!(find("find", &|q| q.case_sensitive = true), vec!["src/app.ts:1", "src/app.ts:2", "src/web/Login.java:2", "새 파일.txt:1"]);
+        assert_eq!(find("find", &|q| q.whole_word = true), vec!["src/app.ts:2", "src/web/Login.java:3", "새 파일.txt:1"]);
+        assert_eq!(find(r"find\(\d\)", &|q| q.regex = true), vec!["src/app.ts:2"]);
+        assert_eq!(find("find", &|q| q.mask = "*.java".into()), vec!["src/web/Login.java:2", "src/web/Login.java:3"]);
+        assert_eq!(find("find", &|q| q.mask = "!*.java, !*.txt".into()), vec!["src/app.ts:1", "src/app.ts:2"]);
+        assert_eq!(find("find", &|q| q.mask = "src/web/*".into()).len(), 2);
+        assert_eq!(find("찾을", &|_| {}), vec!["메모.txt:1"]);
+        assert!(find("없는 글자", &|_| {}).is_empty());
+        // '-'로 시작해도 옵션이 아니다
+        assert!(find("--all", &|_| {}).is_empty());
+        let r = git.grep(&GrepQuery { text: "find".into(), ..Default::default() }).unwrap();
+        assert_eq!((r.files, r.truncated), (3, false));
+        assert_eq!(r.hits[0].text, "const finder = 1");
+        assert!(git.grep(&GrepQuery { text: "(".into(), regex: true, ..Default::default() }).is_err());
     }
 
     #[test]

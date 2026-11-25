@@ -22,6 +22,7 @@
     path = null,
     blame = null,
     range = null,
+    scrollTo = null,
     onrange,
     onblame,
   }: {
@@ -30,6 +31,8 @@
     path?: string | null
     blame?: BlameCell[] | null
     range?: [number, number] | null
+    /** 이 줄이 보이게 스크롤한다 (바뀔 때마다) */
+    scrollTo?: number | null
     onrange?: (r: [number, number] | null) => void
     onblame?: (sha: string) => void
   } = $props()
@@ -59,6 +62,13 @@
     onrange([Math.min(dragFrom, n), Math.max(dragFrom, n)])
   }
   const up = () => (dragFrom = null)
+
+  let box: HTMLDivElement | undefined = $state()
+  $effect(() => {
+    const n = scrollTo
+    if (!n || !box || !lines.length) return
+    box.scrollTop = Math.max(0, (n - 1) * ROW - box.clientHeight / 3)
+  })
   /** 아직 커밋하지 않은 줄 (blame이 0000…으로 알려 준다) */
   const uncommitted = (sha: string) => /^0+$/.test(sha)
   const inRange = (n: number) => !!range && n >= range[0] && n <= range[1]
@@ -66,7 +76,7 @@
 
 <svelte:window onpointerup={up} />
 
-<div class="code" bind:clientHeight={height} onscroll={(e) => (scrollTop = (e.currentTarget as HTMLDivElement).scrollTop)}>
+<div class="code" bind:this={box} bind:clientHeight={height} onscroll={(e) => (scrollTop = (e.currentTarget as HTMLDivElement).scrollTop)}>
   <div class="rows" style="height:{lines.length * ROW}px">
     <div style="transform:translateY({start * ROW}px)">
       {#each lines.slice(start, end) as text, k (start + k)}

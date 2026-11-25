@@ -67,7 +67,7 @@
   </div>
   {#if q.trim() && all.length}
     <div class="foot muted">
-      <span>{isWildcard(q) ? '와일드카드 검색: * 아무 글자들, ? 한 글자 (/가 있으면 경로에서)' : '글자 순서대로 찾기 · *, ?를 쓰면 이름 패턴으로 찾습니다'}</span>
+      <span>{isWildcard(q) ? '와일드카드: * 아무 글자들(폴더 넘음), ? 한 글자 · 이름에서 맞는 것 다음에 경로에서 맞는 것' : '글자 순서대로 찾기 · *, ?를 쓰면 이름·경로 패턴으로 찾습니다'}</span>
       <span class="grow"></span>
       <span>{found.total.toLocaleString()}개{found.total > shown.length ? ` 중 ${shown.length}개` : ''}</span>
     </div>

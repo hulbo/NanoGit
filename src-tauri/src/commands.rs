@@ -213,6 +213,12 @@ pub async fn files_list(root: String, rev: Option<String>) -> Result<Vec<String>
     blocking(move || open(&root)?.files(rev.as_deref())).await
 }
 
+/// 내용으로 찾기 (Ctrl+H)
+#[tauri::command]
+pub async fn content_search(root: String, query: GrepQuery) -> Result<GrepResult, String> {
+    blocking(move || open(&root)?.grep(&query)).await
+}
+
 /// 저장소를 바꾸는 조작 (커밋·push·스테이지 등). git이 남긴 글을 돌려준다
 #[tauri::command]
 pub async fn git_op(core: Core<'_>, root: String, op: Op) -> Result<String, String> {

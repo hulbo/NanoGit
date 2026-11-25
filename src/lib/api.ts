@@ -22,6 +22,8 @@ import type {
   TextBlob,
   TrayAction,
   UpdateInfo,
+  GrepQuery,
+  GrepResult,
 } from './types'
 import type { TraySummary } from './tray'
 
@@ -54,6 +56,8 @@ export interface Backend {
   fileContent(root: string, path: string, rev?: string | null): Promise<TextBlob>
   lineHistory(root: string, path: string, start: number, end: number, rev?: string | null): Promise<LineHistoryEntry[]>
   files(root: string, rev?: string | null): Promise<string[]>
+  /** 내용으로 찾기 (작업 트리, git grep) */
+  contentSearch(root: string, query: GrepQuery): Promise<GrepResult>
   fetch(root: string): Promise<string>
   /** 저장소를 바꾸는 조작. git이 남긴 글을 돌려준다 (실패하면 그 글로 던진다) */
   op(root: string, op: GitOp): Promise<string>
@@ -124,6 +128,7 @@ async function createTauriBackend(): Promise<Backend> {
     fileContent: (root, path, rev) => call('file_content', { root, path, rev: rev ?? null }),
     lineHistory: (root, path, start, end, rev) => call('line_history', { root, path, start, end, rev: rev ?? null }),
     files: (root, rev) => call('files_list', { root, rev: rev ?? null }),
+    contentSearch: (root, query) => call('content_search', { root, query }),
     fetch: (root) => call('fetch', { root }),
     op: (root, op) => call('git_op', { root, op }),
     watch: (roots) => call('watch_set', { roots }),
