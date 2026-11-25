@@ -1,6 +1,6 @@
 [package]
 name = "nanogit"
-version = "0.1.4"
+version = "0.1.5"
 description = "AI가 하는 git 작업을 지켜보는 가벼운 git 모니터"
 authors = ["hulbo"]
 license = "MIT"
