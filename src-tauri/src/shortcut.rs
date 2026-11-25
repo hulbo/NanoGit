@@ -136,7 +136,8 @@ mod tests {
 
         assert_eq!(ensure_once(tmp.path(), &link, &exe), Ok(true));
         let (target, args) = read(&link);
-        assert_eq!(Path::new(&target), exe);
+        // 임시 폴더가 짧은 이름(RUNNER~1)일 수 있어 실제 경로로 맞춰 비교한다
+        assert_eq!(std::fs::canonicalize(&target).unwrap(), std::fs::canonicalize(&exe).unwrap());
         assert_eq!(args, UPDATE_ARG);
 
         // 사용자가 지우면 다시 만들지 않는다
