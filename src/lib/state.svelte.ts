@@ -427,6 +427,8 @@ class App {
         this.toast(this.settings.notifyEnabled ? '알림을 켰습니다' : '알림을 껐습니다 (트레이 메뉴나 설정에서 다시 켤 수 있습니다)', 'info')
       } else if (a.kind === 'fetchAll') {
         void this.fetchAll(false)
+      } else if (a.kind === 'updateNow') {
+        void this.updateNow()
       }
     })
     await this.syncWatch()
@@ -443,6 +445,7 @@ class App {
     this.setupFetchTimer()
     this.setupUpdateTimer()
     this.ready = true
+    if (this.info?.updateRequested) void this.updateNow()
   }
 
   applyTheme() {
@@ -488,17 +491,19 @@ class App {
     }
   }
 
-  /** 새 버전을 받아 설치한다. 확인을 받고, 받는 동안 상태 표시줄에 진행률을 보인다 */
-  async installUpdate() {
+  /** 새 버전을 받아 설치한다. 확인을 받고(ask), 받는 동안 상태 표시줄에 진행률을 보인다 */
+  async installUpdate(ask = true) {
     const u = this.update
     if (!u || this.updateProgress !== null) return
-    const notes = (u.notes ?? '').replace(/\*\*|`/g, '').replace(/^#+\s*/gm, '').trim()
-    const fields: DialogSpec['fields'] = [
-      { kind: 'info', text: `NanoGit ${u.current} → ${u.version}. 받아서 설치하면 NanoGit이 잠시 닫혔다가 다시 켜지고, 감시도 이어서 합니다.` },
-    ]
-    if (notes) fields.push({ kind: 'output', text: notes })
-    const ok = await this.ask({ title: `NanoGit ${u.version}로 업데이트`, icon: 'pull', fields, ok: '업데이트' })
-    if (!ok) return
+    if (ask) {
+      const notes = (u.notes ?? '').replace(/\*\*|`/g, '').replace(/^#+\s*/gm, '').trim()
+      const fields: DialogSpec['fields'] = [
+        { kind: 'info', text: `NanoGit ${u.current} → ${u.version}. 받아서 설치하면 NanoGit이 잠시 닫혔다가 다시 켜지고, 감시도 이어서 합니다.` },
+      ]
+      if (notes) fields.push({ kind: 'output', text: notes })
+      const ok = await this.ask({ title: `NanoGit ${u.version}로 업데이트`, icon: 'pull', fields, ok: '업데이트' })
+      if (!ok) return
+    }
     this.updateProgress = 0
     try {
       await this.backend.updateInstall((got, total) => (this.updateProgress = total ? Math.min(1, got / total) : -1))
@@ -506,6 +511,34 @@ class App {
       this.toast(errorMessage(e), 'error')
     } finally {
       this.updateProgress = null
+    }
+  }
+
+  /** 바탕화면의 "NanoGit 업데이트" 바로가기로 켰을 때: 새 버전이 있으면 묻지 않고 바로 받아 설치한다 */
+  async updateNow() {
+    if (this.updateProgress !== null) return
+    this.toast('새 버전을 확인하는 중…', 'info')
+    try {
+      this.update = await this.backend.updateCheck()
+    } catch (e) {
+      this.toast(errorMessage(e), 'error')
+      return
+    }
+    if (!this.update) {
+      this.toast(`이미 최신 버전입니다 (NanoGit ${this.info?.version ?? ''})`, 'success')
+      return
+    }
+    this.toast(`NanoGit ${this.update.version}로 업데이트합니다. 받은 뒤 잠시 닫혔다가 다시 켜집니다`, 'info')
+    await this.installUpdate(false)
+  }
+
+  /** 설정: 바탕화면에 "NanoGit 업데이트" 바로가기를 (다시) 만든다 */
+  async makeUpdateShortcut() {
+    try {
+      const path = await this.backend.updateShortcut()
+      this.toast(`바탕화면에 바로가기를 만들었습니다: ${path.split(/[\\/]/).pop()}`, 'success')
+    } catch (e) {
+      this.toast(errorMessage(e), 'error')
     }
   }
 

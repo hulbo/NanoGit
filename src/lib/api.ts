@@ -32,6 +32,8 @@ export interface Backend {
   updateCheck(): Promise<UpdateInfo | null>
   /** 새 버전을 받아 설치한다. 앱에서는 설치 프로그램이 뜨고 이 앱은 끝난다 (설치 뒤 다시 켜짐) */
   updateInstall(onProgress: (got: number, total: number | null) => void): Promise<void>
+  /** 바탕화면에 "NanoGit 업데이트" 바로가기를 (다시) 만든다. 만든 경로 */
+  updateShortcut(): Promise<string>
   settingsGet(): Promise<Settings>
   settingsSave(settings: Settings): Promise<void>
   /** 고른 폴더에서 저장소 루트를 찾는다 */
@@ -103,6 +105,7 @@ async function createTauriBackend(): Promise<Backend> {
         off()
       }
     },
+    updateShortcut: () => call('update_shortcut'),
     settingsGet: () => call('settings_get'),
     settingsSave: (settings) => call('settings_save', { settings }),
     repoResolve: (path) => call('repo_resolve', { path }),

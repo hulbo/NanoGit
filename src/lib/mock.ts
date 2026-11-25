@@ -484,7 +484,17 @@ export function createMockBackend(): Backend {
       }
       throw new Error('미리보기에서는 설치하지 않습니다')
     },
-    appInfo: () => delay({ version: '0.1.0', gitPath: 'C:/Program Files/Git/cmd/git.exe', gitVersion: 'git version 2.50.1 (미리보기)', gitError: null, dataDir: '(브라우저 미리보기)' }),
+    updateShortcut: () => delay('C:/Users/me/Desktop/NanoGit 업데이트.lnk'),
+    // ?update=now로 열면 "NanoGit 업데이트" 바로가기로 켠 것처럼
+    appInfo: () =>
+      delay({
+        version: '0.1.0',
+        gitPath: 'C:/Program Files/Git/cmd/git.exe',
+        gitVersion: 'git version 2.50.1 (미리보기)',
+        gitError: null,
+        dataDir: '(브라우저 미리보기)',
+        updateRequested: typeof location !== 'undefined' && new URLSearchParams(location.search).get('update') === 'now',
+      }),
     settingsGet: () => delay(structuredClone(settings)),
     async settingsSave(s) {
       settings = structuredClone(s)

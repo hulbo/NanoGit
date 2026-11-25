@@ -281,8 +281,8 @@ export type GitOp =
   | { kind: 'restoreFile'; path: string; rev: string }
   | { kind: 'ignore'; pattern: string }
 
-/** 트레이 메뉴에서 고른 동작 */
-export type TrayAction = { kind: 'openRepo'; root: string } | { kind: 'toggleNotify' } | { kind: 'fetchAll' }
+/** 트레이 메뉴에서 고른 동작 (updateNow: 떠 있을 때 "NanoGit 업데이트" 바로가기를 누름) */
+export type TrayAction = { kind: 'openRepo'; root: string } | { kind: 'toggleNotify' } | { kind: 'fetchAll' } | { kind: 'updateNow' }
 
 export interface AppInfo {
   version: string
@@ -292,6 +292,8 @@ export interface AppInfo {
   dataDir: string
   /** 업데이트로 다시 켜졌으면 그 전 버전 */
   updatedFrom?: string | null
+  /** "NanoGit 업데이트" 바로가기(--update)로 켜졌다 */
+  updateRequested?: boolean
 }
 
 /** 새 버전 (GitHub 릴리스) */

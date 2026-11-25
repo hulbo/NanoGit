@@ -43,6 +43,8 @@ pub enum TrayAction {
     OpenRepo { root: String },
     ToggleNotify,
     FetchAll,
+    /// 바탕화면의 "NanoGit 업데이트" 바로가기를 눌렀다 (이미 떠 있을 때)
+    UpdateNow,
 }
 
 fn current() -> &'static Mutex<Option<TraySummary>> {

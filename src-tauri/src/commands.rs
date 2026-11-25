@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -23,6 +24,8 @@ pub struct AppCore {
     pub busy: Arc<Mutex<HashSet<String>>>,
     /// 업데이트로 다시 켜졌으면 그 전 버전
     pub updated_from: Option<String>,
+    /// "NanoGit 업데이트" 바로가기(--update)로 켜졌다. 화면이 한 번 읽으면 지운다
+    pub update_requested: AtomicBool,
 }
 
 /// 저장소 하나를 조작하는 동안 잡아 두는 표시. 끝나면(버려지면) 풀린다
@@ -69,6 +72,7 @@ pub struct AppInfo {
     git_error: Option<String>,
     data_dir: String,
     updated_from: Option<String>,
+    update_requested: bool,
 }
 
 #[tauri::command]
@@ -76,11 +80,13 @@ pub async fn app_info(app: tauri::AppHandle, core: Core<'_>) -> Result<AppInfo, 
     let data_dir = display(core.store.dir());
     let version = app.package_info().version.to_string();
     let updated_from = core.updated_from.clone();
+    let update_requested = core.update_requested.swap(false, Ordering::SeqCst);
     blocking(move || {
-        Ok(match Git::version() {
-            Ok((path, ver)) => AppInfo { version, git_path: Some(path), git_version: Some(ver), git_error: None, data_dir, updated_from },
-            Err(e) => AppInfo { version, git_path: None, git_version: None, git_error: Some(e), data_dir, updated_from },
-        })
+        let (git_path, git_version, git_error) = match Git::version() {
+            Ok((path, ver)) => (Some(path), Some(ver), None),
+            Err(e) => (None, None, Some(e)),
+        };
+        Ok(AppInfo { version, git_path, git_version, git_error, data_dir, updated_from, update_requested })
     })
     .await
 }

@@ -48,7 +48,8 @@
           "Korean",
           "English"
         ],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "./windows/hooks.nsh"
       }
     },
     "createUpdaterArtifacts": true

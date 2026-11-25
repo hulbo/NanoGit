@@ -81,6 +81,9 @@ src-tauri/src/               백엔드 (Rust, Tauri 2)
   store.rs                   설정 파일
   tray.rs                    트레이 아이콘·메뉴, 창 닫기 → 트레이, Windows 시작 시 실행(HKCU Run, --tray)
   shell.rs                   터미널·편집기 열기
+  update.rs                  앱 안 업데이트 (새 버전 확인·받기·설치)
+  shortcut.rs                바탕화면 "NanoGit 업데이트" 바로가기 (--update)
+src-tauri/windows/hooks.nsh  설치 프로그램 훅: 제거할 때 업데이트 바로가기 지우기
 docs/                        기획서, 개발 가이드, 스크린샷, 릴리스 노트(releases/)
 scripts/version.mjs          앱 버전 맞추기·확인 (릴리스용)
 scripts/latest-json.mjs      앱 안 업데이트가 읽는 latest.json 만들기 (CI가 릴리스에 올림)
@@ -127,6 +130,10 @@ scripts/latest-json.mjs      앱 안 업데이트가 읽는 latest.json 만들�
 - 앱은 켠 뒤 15초, 그다음 6시간마다(설정에서 끌 수 있음) `releases/latest/download/latest.json`을 봅니다.
   새 버전이 있으면 알림과 상태 표시줄의 "새 버전" 버튼이 뜨고, 누르면 받아서 NSIS 설치본을 passive로 실행합니다.
   앱은 바로 끝나고, 설치가 끝나면 다시 켜져 "업데이트했습니다"를 알립니다(`src-tauri/src/update.rs`, 설정 폴더의 `updated-from.txt`).
+- 바탕화면의 "NanoGit 업데이트" 바로가기(`src-tauri/src/shortcut.rs`): `nanogit.exe --update`를 실행해 확인 없이 바로 받아 설치합니다.
+  - 설치본이 처음 켜질 때 한 번 만들고 설정 폴더에 `update-shortcut.txt`를 남깁니다. 사용자가 지우면 다시 만들지 않고, 설정의 "바탕화면에 만들기"로 다시 만듭니다.
+  - 이미 떠 있으면 single-instance가 `--update`를 넘겨 받아 `tray://action`(`updateNow`)으로 화면에 알립니다.
+  - 제거할 때는 설치 프로그램 훅(`src-tauri/windows/hooks.nsh`, UTF-8 BOM)이 바로가기와 표시 파일을 지웁니다. 업데이트 설치 중에는 지우지 않습니다.
 - 서명: 설치본은 개인 키로 서명하고, 앱은 `tauri.conf.json`의 `plugins.updater.pubkey`로 확인합니다.
   - 개인 키: 이 PC의 `%USERPROFILE%\.tauri\nanogit.key` (저장소에 넣지 않음. 잃어버리면 이미 설치된 앱은 새 키로 서명한 업데이트를 받지 못하므로 한 번 더 손으로 설치해야 합니다).
   - CI: 저장소 Actions secret `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용, 등록함). 지금 키는 비밀번호가 없어

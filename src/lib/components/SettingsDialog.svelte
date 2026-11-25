@@ -133,6 +133,12 @@
         <button class="ghost" disabled={checking || app.updateProgress !== null} onclick={checkNow}><Icon name="refresh" size={12} />{checking ? '확인 중…' : '업데이트 확인'}</button>
         <label class="chk"><input type="checkbox" bind:checked={s.autoUpdate} onchange={save} />자동 확인 (켤 때·6시간마다)</label>
       </div>
+      <div class="ver">
+        <span>바로가기</span>
+        <button class="ghost" onclick={() => void app.makeUpdateShortcut()} title="누르면 바로 새 버전을 받아 설치하는 바로가기 (처음 켤 때 한 번 만들어 둡니다)"
+          ><Icon name="pull" size={12} />바탕화면에 "NanoGit 업데이트" 만들기</button
+        >
+      </div>
       <div><span>git</span>{app.info?.gitVersion ?? app.info?.gitError ?? ''} <span class="muted">{app.info?.gitPath ?? ''}</span></div>
       <div><span>설정 폴더</span>{app.info?.dataDir ?? ''}</div>
     </div>
